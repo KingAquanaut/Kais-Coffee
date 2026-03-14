@@ -1,0 +1,33 @@
+# Development tooling
+.git
+.github
+node_modules
+
+# Local environment files — never bake secrets into the image
+.env
+.env.local
+.env.*.local
+
+# Sail / Docker dev compose files
+docker-compose*
+Dockerfile*
+
+# Test / CI artifacts
+.phpunit.cache
+coverage
+
+# Temp / editor files
+*.log
+.DS_Store
+Thumbs.db
+.idea
+.vscode
+
+# Laravel cache — generated fresh in entrypoint.sh
+bootstrap/cache/*.php
+storage/framework/cache
+storage/framework/sessions
+storage/framework/views
+
+# Vendor is rebuilt in the deps stage
+# (include it so IDEs work locally, but the image reinstalls cleanly)

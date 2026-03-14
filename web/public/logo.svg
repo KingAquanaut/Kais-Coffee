@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 200" fill="none">
+
+  <!-- White card background inside border -->
+  <rect x="14" y="70" width="492" height="118" fill="white" stroke="#111111" stroke-width="2.5"/>
+
+  <!-- ── Blueberry cluster (centered at x=260) ── -->
+
+  <!-- Back-left berry -->
+  <circle cx="242" cy="50" r="22" fill="#4a57aa"/>
+  <!-- Back-right berry -->
+  <circle cx="278" cy="44" r="20" fill="#5262b8"/>
+  <!-- Front berry (largest, overlaps border top) -->
+  <circle cx="260" cy="64" r="24" fill="#3d4f9e"/>
+
+  <!-- Specular highlights -->
+  <circle cx="236" cy="43" r="5.5" fill="#9aa5d8" opacity="0.68"/>
+  <circle cx="272" cy="37" r="5"   fill="#9aa5d8" opacity="0.68"/>
+  <circle cx="254" cy="56" r="5"   fill="#9aa5d8" opacity="0.68"/>
+
+  <!-- Stem nubs -->
+  <circle cx="242" cy="29" r="3"   fill="#1a1a3a" opacity="0.75"/>
+  <circle cx="278" cy="25" r="2.8" fill="#1a1a3a" opacity="0.75"/>
+  <circle cx="260" cy="41" r="3"   fill="#1a1a3a" opacity="0.75"/>
+
+  <!-- Leaves -->
+  <!-- Left leaf -->
+  <ellipse cx="218" cy="30" rx="17" ry="7.5" fill="#3d8028" transform="rotate(-38,218,30)"/>
+  <!-- Center-top leaf -->
+  <ellipse cx="258" cy="15" rx="16" ry="7"   fill="#4a9432" transform="rotate(-4,258,15)"/>
+  <!-- Right leaf -->
+  <ellipse cx="300" cy="26" rx="17" ry="7.5" fill="#3d8028" transform="rotate(36,300,26)"/>
+
+  <!-- ── Wordmark ── -->
+  <text
+    x="260" y="149"
+    text-anchor="middle"
+    font-family="Georgia, 'Times New Roman', serif"
+    font-size="52"
+    font-weight="900"
+    fill="#111111"
+    letter-spacing="3"
+  >KAI&apos;S COFFEE</text>
+
+</svg>

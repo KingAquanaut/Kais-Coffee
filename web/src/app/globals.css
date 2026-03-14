@@ -1,0 +1,273 @@
+@import "tailwindcss";
+
+/* ──────────────────────────────────────────────
+   Kai's Coffee — Design System
+   Soft powder blue · Elegant serif · Airy luxury
+   ────────────────────────────────────────────── */
+
+:root {
+  --kc-bg:        rgba(214, 232, 245, 0.82);   /* semi-transparent so watercolor bleeds through */
+  --kc-bg-solid:  #d6e8f5;                      /* opaque version for borders, badges, etc.      */
+  --kc-bg-mid:    #bcd8ed;
+  --kc-blue-deep: #3a7ca5;
+  --kc-black:     #1a1a1a;
+  --kc-border:    #1a1a1a;
+  --kc-white:     #ffffff;
+  --kc-cream:     #faf7f2;
+  --kc-cream-dark:#f0ebe2;
+  --kc-gold:      #b8962e;
+  --kc-gold-lt:   #f0dcaa;
+  --kc-success:   #2d7a4e;
+  --kc-error:     #b94040;
+  --kc-muted:     #6b7280;
+  --radius-card:  0.875rem;
+  --radius-btn:   9999px;
+  --font-heading: var(--font-heading, "Playfair Display", Georgia, serif);
+  --kc-ease:      cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --kc-duration:  240ms;
+  --font-body:    var(--font-body, "Lato", system-ui, sans-serif);
+  --font-script:  var(--font-script, "Dancing Script", cursive);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  /* Background handled by a position:fixed div in layout.tsx — avoids
+     scroll-triggered full-page repaints from background-attachment:fixed */
+  background-color: #f5f9fc;
+  color:            var(--kc-black);
+  font-family:      var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  min-height: 100svh;
+  /* Transparent so the html watercolor shows through page wrappers that
+     use --kc-bg (now rgba 82 % opaque), creating a consistent soft texture */
+  background: transparent;
+}
+
+h1, h2, h3, h4 {
+  font-family: var(--font-heading);
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+/* Card */
+.kc-card {
+  background: var(--kc-cream);
+  border: 1.5px solid var(--kc-border);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+/* Circular image */
+.kc-img-circle {
+  border-radius: 50%;
+  overflow: hidden;
+  aspect-ratio: 1;
+  object-fit: cover;
+}
+
+/* Image placeholder circle */
+.kc-img-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--kc-bg-mid), var(--kc-bg));
+  border: 1.5px solid rgba(26,26,26,0.15);
+  font-family: var(--font-heading);
+  font-weight: 700;
+  color: var(--kc-black);
+  aspect-ratio: 1;
+}
+
+/* Buttons */
+.kc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.625rem 1.5rem;
+  background: var(--kc-black);
+  color: var(--kc-white);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 1.5px solid var(--kc-black);
+  border-radius: var(--radius-btn);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+  text-decoration: none;
+}
+.kc-btn:hover  { background: var(--kc-blue-deep); border-color: var(--kc-blue-deep); }
+.kc-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.kc-btn-outline { background: transparent; color: var(--kc-black); }
+.kc-btn-outline:hover { background: var(--kc-black); color: var(--kc-white); }
+
+.kc-btn-ghost { background: transparent; border-color: transparent; color: var(--kc-black); }
+.kc-btn-ghost:hover { background: var(--kc-bg-mid); border-color: transparent; }
+
+.kc-btn-sm { padding: 0.375rem 0.875rem; font-size: 0.6875rem; }
+
+.kc-btn-gold { background: var(--kc-gold); border-color: var(--kc-gold); color: var(--kc-white); }
+.kc-btn-gold:hover { background: #9a7a22; border-color: #9a7a22; }
+
+.kc-btn-danger { background: var(--kc-error); border-color: var(--kc-error); color: var(--kc-white); }
+
+/* Form inputs */
+.kc-input {
+  width: 100%;
+  border: 1.5px solid var(--kc-border);
+  border-radius: 0.625rem;
+  padding: 0.625rem 1rem;
+  font-family: var(--font-body);
+  font-size: 0.9375rem;
+  background: var(--kc-white);
+  color: var(--kc-black);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.kc-input:focus {
+  border-color: var(--kc-blue-deep);
+  box-shadow: 0 0 0 3px rgba(58,124,165,0.15);
+}
+.kc-input::placeholder { color: var(--kc-muted); }
+
+.kc-label {
+  display: block;
+  font-weight: 700;
+  font-size: 0.8125rem;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.375rem;
+}
+
+/* Badges */
+.kc-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.625rem;
+  border-radius: 9999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.kc-badge-gold    { background: var(--kc-gold-lt); color: var(--kc-gold); }
+.kc-badge-blue    { background: var(--kc-bg-mid);   color: var(--kc-blue-deep); }
+.kc-badge-success { background: #d1fae5; color: var(--kc-success); }
+.kc-badge-error   { background: #fee2e2; color: var(--kc-error); }
+.kc-badge-muted   { background: #e5e7eb; color: var(--kc-muted); }
+
+/* ── Motion System ─────────────────────────────────────────────────────────
+
+   .kc-lift        — subtle translateY + shadow on hover (cards, rewards)
+   .kc-team-card   — lift + inner .kc-team-img zoom on hover (team cards)
+   .kc-menu-tile   — soft lift + cream wash on hover (menu grid tiles)
+   .kc-hero-bg-motion — slow-breathing scale on hero background elements
+   ────────────────────────────────────────────────────────────────────── */
+
+/* Card lift */
+.kc-lift {
+  transition: transform var(--kc-duration) var(--kc-ease),
+              box-shadow var(--kc-duration) var(--kc-ease);
+}
+.kc-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 28px rgba(26, 26, 26, 0.10);
+}
+
+/* Team card — combines lift with inner image zoom */
+.kc-team-card {
+  transition: transform var(--kc-duration) var(--kc-ease),
+              box-shadow var(--kc-duration) var(--kc-ease);
+}
+.kc-team-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 36px rgba(26, 26, 26, 0.13);
+}
+.kc-team-img {
+  transition: transform 380ms var(--kc-ease);
+}
+.kc-team-card:hover .kc-team-img {
+  transform: scale(1.07);
+}
+
+/* Menu tile — soft lift + cream wash (no card border needed) */
+.kc-menu-tile {
+  border-radius: var(--radius-card);
+  transition: transform var(--kc-duration) var(--kc-ease),
+              background var(--kc-duration) var(--kc-ease);
+}
+.kc-menu-tile:hover {
+  transform: translateY(-3px);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+/* Hero background — slow-breathing depth effect */
+.kc-hero-bg-motion {
+  animation: kc-hero-breathe 14s ease-in-out infinite;
+}
+@keyframes kc-hero-breathe {
+  0%, 100% { transform: scale(1);    }
+  50%       { transform: scale(1.04); }
+}
+
+/* ── Coffee steam ──────────────────────────────────────────────────────────
+   Slow upward rise with a gentle horizontal drift.
+
+   Tuning guide:
+   • Opacity:   adjust the rgba alpha in HeroSteam.tsx (color variable)
+   • Speed:     change each wisp's `dur` value in WISPS (seconds per cycle)
+   • Rise dist: change translateY below (default –160px)
+   • Drift:     change each wisp's `dx` value in WISPS
+   • Density:   add/remove entries in the WISPS array
+   ─────────────────────────────────────────────────────────────────────── */
+.kc-steam-wisp {
+  will-change: transform, opacity;
+}
+@keyframes kc-steam-rise {
+  0%   {
+    transform: translateY(0px) translateX(0px) scaleX(1);
+    opacity: 0;
+  }
+  14%  { opacity: 1; }
+  86%  { opacity: 1; }
+  100% {
+    transform: translateY(-180px) translateX(var(--kc-steam-dx, 8px)) scaleX(1.4);
+    opacity: 0;
+  }
+}
+
+/* Reduced-motion safety net */
+@media (prefers-reduced-motion: reduce) {
+  .kc-lift,
+  .kc-team-card,
+  .kc-menu-tile     { transition: none; }
+  .kc-lift:hover    { transform: none; box-shadow: none; }
+  .kc-team-card:hover { transform: none; box-shadow: none; }
+  .kc-menu-tile:hover { transform: none; background: initial; }
+  .kc-team-img      { transition: none; }
+  .kc-team-card:hover .kc-team-img { transform: none; }
+  .kc-hero-bg-motion { animation: none; }
+  /* Steam completely hidden — no movement for motion-sensitive users */
+  .kc-steam-wisp     { animation: none; opacity: 0; }
+}
+
+/* ── Transparent nav (hero overlay mode) ───────────────────────────────────
+   Applied via PublicNav when overlayHero=true. The transition from
+   transparent → opaque is driven by inline styles + scroll state.
+   This rule ensures button hover states stay coherent.           */
+.kc-nav .kc-btn:hover {
+  /* Slightly stronger gold on ghost buttons in hero mode */
+  opacity: 0.9;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--kc-bg-mid); border-radius: 3px; }

@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 960" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <!-- Large wash: turbulence distortion + heavy blur = soft organic edges -->
+    <filter id="wc-lg" x="-45%" y="-45%" width="190%" height="190%" color-interpolation-filters="linearRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.022 0.028" numOctaves="3" seed="7" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="45" xChannelSelector="R" yChannelSelector="G" result="warped"/>
+      <feGaussianBlur in="warped" stdDeviation="62"/>
+    </filter>
+    <!-- Medium wash: less displacement, moderate blur -->
+    <filter id="wc-md" x="-45%" y="-45%" width="190%" height="190%" color-interpolation-filters="linearRGB">
+      <feTurbulence type="fractalNoise" baseFrequency="0.032 0.038" numOctaves="3" seed="14" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="30" xChannelSelector="R" yChannelSelector="G" result="warped"/>
+      <feGaussianBlur in="warped" stdDeviation="44"/>
+    </filter>
+    <!-- Soft bloom: gentle blur only, no distortion -->
+    <filter id="wc-sm" x="-50%" y="-50%" width="200%" height="200%" color-interpolation-filters="linearRGB">
+      <feGaussianBlur stdDeviation="32"/>
+    </filter>
+  </defs>
+
+  <!-- ── White canvas base ── -->
+  <rect width="1440" height="960" fill="#f8fbfe"/>
+
+  <!-- ── Corner anchor washes — most visible, richest color ── -->
+
+  <!-- Top-left -->
+  <ellipse cx="70"  cy="110" rx="380" ry="290" fill="rgba(98,158,210,0.38)"  filter="url(#wc-lg)"/>
+  <ellipse cx="160" cy="60"  rx="260" ry="180" fill="rgba(118,172,222,0.28)" filter="url(#wc-md)"/>
+
+  <!-- Top-right -->
+  <ellipse cx="1380" cy="90"  rx="360" ry="260" fill="rgba(102,162,214,0.35)"  filter="url(#wc-lg)"/>
+  <ellipse cx="1260" cy="180" rx="240" ry="160" fill="rgba(120,174,224,0.25)"  filter="url(#wc-md)"/>
+
+  <!-- Bottom-left -->
+  <ellipse cx="110"  cy="890" rx="420" ry="280" fill="rgba(95,155,208,0.36)"  filter="url(#wc-lg)"/>
+  <ellipse cx="280"  cy="820" rx="230" ry="160" fill="rgba(115,170,220,0.24)" filter="url(#wc-md)"/>
+
+  <!-- Bottom-right -->
+  <ellipse cx="1360" cy="900" rx="390" ry="270" fill="rgba(100,160,212,0.38)"  filter="url(#wc-lg)"/>
+  <ellipse cx="1180" cy="850" rx="250" ry="170" fill="rgba(118,172,222,0.26)"  filter="url(#wc-md)"/>
+
+  <!-- ── Mid-edge washes — lighter, secondary layer ── -->
+
+  <!-- Left edge center -->
+  <ellipse cx="60"  cy="500" rx="260" ry="200" fill="rgba(110,165,215,0.22)" filter="url(#wc-md)"/>
+
+  <!-- Right edge center -->
+  <ellipse cx="1400" cy="480" rx="280" ry="210" fill="rgba(108,163,213,0.22)" filter="url(#wc-md)"/>
+
+  <!-- Top center -->
+  <ellipse cx="720" cy="60"  rx="360" ry="130" fill="rgba(112,168,218,0.18)" filter="url(#wc-md)"/>
+
+  <!-- Bottom center -->
+  <ellipse cx="700" cy="920" rx="340" ry="120" fill="rgba(105,162,214,0.20)" filter="url(#wc-md)"/>
+
+  <!-- ── Interior accent blooms — very subtle, break up the center ── -->
+  <ellipse cx="400" cy="300" rx="180" ry="130" fill="rgba(118,172,222,0.14)" filter="url(#wc-sm)"/>
+  <ellipse cx="980" cy="220" rx="160" ry="110" fill="rgba(108,165,216,0.13)" filter="url(#wc-sm)"/>
+  <ellipse cx="580" cy="650" rx="200" ry="140" fill="rgba(112,168,218,0.12)" filter="url(#wc-sm)"/>
+  <ellipse cx="1080" cy="640" rx="170" ry="120" fill="rgba(106,163,214,0.13)" filter="url(#wc-sm)"/>
+  <ellipse cx="760" cy="420" rx="140" ry="100" fill="rgba(115,170,220,0.10)" filter="url(#wc-sm)"/>
+</svg>

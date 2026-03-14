@@ -1,0 +1,183 @@
+name: Production — Deploy
+
+# ── Trigger ────────────────────────────────────────────────────────────────────
+# Runs on push to `main` and on manual dispatch.
+# The `deploy-api` and `deploy-web` jobs are gated by the "production" GitHub
+# Environment — configure Required Reviewers there to enforce manual approval
+# before any production deploy goes live.
+#
+# Stack:
+#   API  → Render (Docker, kais-coffee-api-production service)
+#   Web  → Vercel (Next.js, production environment)
+#   DB   → Neon (production database)
+#
+# Prerequisites (one-time setup — see DEPLOYMENT.md):
+#   GitHub Secrets (Settings → Secrets → Actions):
+#     RENDER_PROD_DEPLOY_HOOK   Deploy hook URL from Render dashboard
+#     VERCEL_TOKEN              Vercel personal/team token
+#     VERCEL_ORG_ID             From `vercel link` or Vercel project settings
+#     VERCEL_PROJECT_ID         From `vercel link` or Vercel project settings
+#
+#   Vercel project environment variables (Dashboard → Project → Settings → Env):
+#     NEXT_PUBLIC_API_URL   (Production env)  https://kais-coffee-api.onrender.com/api/v1
+#     NEXT_PUBLIC_APP_NAME  (Production env)  Kai's Coffee
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  # Never cancel an in-flight production deploy — let it finish.
+  cancel-in-progress: false
+
+env:
+  PHP_VERSION: "8.3"
+  NODE_VERSION: "20"
+
+jobs:
+  # ── 1a. Laravel API tests ────────────────────────────────────────────────────
+  test-api:
+    name: API tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: kais_coffee_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: secret
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: pdo, pdo_pgsql, mbstring, xml, ctype, json
+          coverage: none
+
+      - uses: actions/cache@v4
+        with:
+          path: api/vendor
+          key: composer-${{ hashFiles('api/composer.lock') }}
+          restore-keys: composer-
+
+      - run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Prepare .env
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          echo "DB_CONNECTION=pgsql"           >> .env
+          echo "DB_HOST=127.0.0.1"             >> .env
+          echo "DB_PORT=5432"                  >> .env
+          echo "DB_DATABASE=kais_coffee_test"  >> .env
+          echo "DB_USERNAME=postgres"          >> .env
+          echo "DB_PASSWORD=secret"            >> .env
+
+      - run: php artisan migrate --force
+      - run: php artisan test --parallel
+
+  # ── 1b. Next.js build + lint ─────────────────────────────────────────────────
+  build-web:
+    name: Web build & lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+
+      - name: Build
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+          NEXT_PUBLIC_APP_NAME: "Kai's Coffee"
+        run: npm run build
+
+  # ── 2. Deploy API to Render (production) ─────────────────────────────────────
+  # Pauses here for manual approval if the "production" GitHub Environment has
+  # Required Reviewers configured (Settings → Environments → production).
+  #
+  # After approval, POSTs to the Render deploy hook. Render builds a new Docker
+  # image from main, runs entrypoint.sh (which migrates the production Neon DB),
+  # and shifts traffic once the health check passes.
+  #
+  # The deploy hook URL is available in:
+  #   Render Dashboard → kais-coffee-api-production → Settings → Deploy Hook
+  deploy-api:
+    name: Deploy API → Render production
+    needs: [test-api, build-web]
+    runs-on: ubuntu-latest
+    environment: production   # ← approval gate lives here
+
+    steps:
+      - name: Trigger Render production deploy
+        run: |
+          response=$(curl --silent --show-error --fail-with-body \
+            --request POST \
+            "${{ secrets.RENDER_PROD_DEPLOY_HOOK }}")
+          echo "Render response: $response"
+
+      - name: Wait for Render health check
+        # Poll until the new production container is serving traffic.
+        # Render holds the old container live until the new one is healthy,
+        # so this is a zero-downtime wait step.
+        run: |
+          echo "Waiting for production API to become healthy..."
+          for i in $(seq 1 36); do
+            status=$(curl --silent --output /dev/null --write-out "%{http_code}" \
+              https://kais-coffee-api.onrender.com/api/v1/health || echo "000")
+            echo "  Attempt $i: HTTP $status"
+            if [ "$status" = "200" ]; then
+              echo "✓ Production API is healthy."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "✗ Production API did not become healthy within 6 minutes."
+          exit 1
+
+  # ── 3. Deploy Web to Vercel (production) ──────────────────────────────────────
+  # Vercel builds and promotes the deployment to production using
+  # NEXT_PUBLIC_API_URL from Vercel's "Production" environment variables.
+  # Runs in parallel with deploy-api (both need tests to pass, not each other).
+  deploy-web:
+    name: Deploy Web → Vercel production
+    needs: [test-api, build-web]
+    runs-on: ubuntu-latest
+    environment: production   # same gate — both jobs require approval
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Vercel (production)
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token:      ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id:     ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: web
+          # --prod promotes this deployment to kaiscoffee.com
+          vercel-args: --prod

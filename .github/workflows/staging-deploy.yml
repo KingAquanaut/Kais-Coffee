@@ -1,0 +1,182 @@
+name: Staging — Deploy
+
+# ── Trigger ────────────────────────────────────────────────────────────────────
+# Runs on every push to `develop` and on manual dispatch.
+#
+# Stack:
+#   API  → Render (Docker, kais-coffee-api-staging service)
+#   Web  → Vercel (Next.js, preview environment)
+#   DB   → Neon (staging database, separate from production)
+#
+# Prerequisites (one-time setup — see DEPLOYMENT.md):
+#   GitHub Secrets (Settings → Secrets → Actions):
+#     RENDER_STAGING_DEPLOY_HOOK   Deploy hook URL from Render dashboard
+#     VERCEL_TOKEN                 Vercel personal/team token
+#     VERCEL_ORG_ID                From `vercel link` or Vercel project settings
+#     VERCEL_PROJECT_ID            From `vercel link` or Vercel project settings
+#
+#   Vercel project environment variables (Dashboard → Project → Settings → Env):
+#     NEXT_PUBLIC_API_URL   (Preview env)  https://kais-coffee-api-staging.onrender.com/api/v1
+#     NEXT_PUBLIC_APP_NAME  (Preview env)  Kai's Coffee
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+concurrency:
+  group: staging-deploy
+  cancel-in-progress: true
+
+env:
+  PHP_VERSION: "8.3"
+  NODE_VERSION: "20"
+
+jobs:
+  # ── 1a. Laravel API tests ────────────────────────────────────────────────────
+  test-api:
+    name: API tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: kais_coffee_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: secret
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: pdo, pdo_pgsql, mbstring, xml, ctype, json
+          coverage: none
+
+      - uses: actions/cache@v4
+        with:
+          path: api/vendor
+          key: composer-${{ hashFiles('api/composer.lock') }}
+          restore-keys: composer-
+
+      - run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Prepare .env
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          echo "DB_CONNECTION=pgsql"           >> .env
+          echo "DB_HOST=127.0.0.1"             >> .env
+          echo "DB_PORT=5432"                  >> .env
+          echo "DB_DATABASE=kais_coffee_test"  >> .env
+          echo "DB_USERNAME=postgres"          >> .env
+          echo "DB_PASSWORD=secret"            >> .env
+
+      - run: php artisan migrate --force
+      - run: php artisan test --parallel
+
+  # ── 1b. Next.js build + lint ─────────────────────────────────────────────────
+  build-web:
+    name: Web build & lint
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+      - run: npm run lint
+      - run: npx tsc --noEmit
+
+      - name: Build
+        # Vercel injects the real NEXT_PUBLIC_API_URL at build time from its
+        # project environment variables. This placeholder keeps the CI build
+        # self-contained and avoids hard-coding staging URLs here.
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+          NEXT_PUBLIC_APP_NAME: "Kai's Coffee"
+        run: npm run build
+
+  # ── 2. Deploy API to Render (staging) ────────────────────────────────────────
+  # POSTs to the Render deploy hook, which triggers a new Docker build + deploy
+  # of the kais-coffee-api-staging service from the HEAD of `develop`.
+  #
+  # Render's entrypoint.sh runs `php artisan migrate --force` before nginx
+  # starts, so migrations are applied automatically on each deploy.
+  #
+  # The deploy hook URL is available in:
+  #   Render Dashboard → kais-coffee-api-staging → Settings → Deploy Hook
+  deploy-api:
+    name: Deploy API → Render staging
+    needs: [test-api, build-web]
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - name: Trigger Render staging deploy
+        run: |
+          response=$(curl --silent --show-error --fail-with-body \
+            --request POST \
+            "${{ secrets.RENDER_STAGING_DEPLOY_HOOK }}")
+          echo "Render response: $response"
+
+      - name: Wait for Render health check
+        # Poll the health endpoint until the new deploy is live (up to 5 min).
+        # Render serves the OLD container until the new one passes its health
+        # check, so this step resolves only when the new version is up.
+        run: |
+          echo "Waiting for staging API to become healthy..."
+          for i in $(seq 1 30); do
+            status=$(curl --silent --output /dev/null --write-out "%{http_code}" \
+              https://kais-coffee-api-staging.onrender.com/api/v1/health || echo "000")
+            echo "  Attempt $i: HTTP $status"
+            if [ "$status" = "200" ]; then
+              echo "✓ Staging API is healthy."
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "✗ Staging API did not become healthy within 5 minutes."
+          exit 1
+
+  # ── 3. Deploy Web to Vercel (staging preview) ─────────────────────────────
+  # Vercel builds the Next.js app and deploys it as a preview deployment.
+  # NEXT_PUBLIC_API_URL is read from Vercel's "Preview" environment variables
+  # (set in the Vercel dashboard — no secrets needed here).
+  deploy-web:
+    name: Deploy Web → Vercel staging
+    needs: [test-api, build-web]
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Vercel (preview)
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token:      ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id:     ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: web
+          # Assign a stable staging URL so you can always find the latest preview.
+          # Replace with your actual staging domain once configured in Vercel.
+          alias-domains: staging.kaiscoffee.com

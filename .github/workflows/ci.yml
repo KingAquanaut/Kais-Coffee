@@ -1,0 +1,120 @@
+name: CI — Pull Request Checks
+
+# ── Trigger ────────────────────────────────────────────────────────────────────
+# Runs on every PR (opened, updated, reopened) and on direct pushes to feature
+# branches.  Does NOT run on pushes to main or develop — those are handled by
+# the dedicated deploy workflows which include their own test jobs.
+on:
+  pull_request:
+    branches-ignore: []          # all target branches
+  push:
+    branches-ignore:
+      - main
+      - develop
+
+# Cancel any in-progress run for the same PR / branch so only the latest
+# commit is tested.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# ── Shared versions ────────────────────────────────────────────────────────────
+env:
+  PHP_VERSION: "8.3"
+  NODE_VERSION: "20"
+
+jobs:
+  # ── Laravel API tests ────────────────────────────────────────────────────────
+  test-api:
+    name: API — PHP ${{ env.PHP_VERSION }} tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: api
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: kais_coffee_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: secret
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: pdo, pdo_pgsql, mbstring, xml, ctype, json
+          coverage: none
+
+      - name: Cache Composer dependencies
+        uses: actions/cache@v4
+        with:
+          path: api/vendor
+          key: composer-${{ hashFiles('api/composer.lock') }}
+          restore-keys: composer-
+
+      - name: Install Composer dependencies
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Prepare .env
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+          # Override DB vars to point at the CI service container
+          echo "DB_CONNECTION=pgsql"            >> .env
+          echo "DB_HOST=127.0.0.1"              >> .env
+          echo "DB_PORT=5432"                   >> .env
+          echo "DB_DATABASE=kais_coffee_test"   >> .env
+          echo "DB_USERNAME=postgres"           >> .env
+          echo "DB_PASSWORD=secret"             >> .env
+
+      - name: Run migrations
+        run: php artisan migrate --force
+
+      - name: Run tests (parallel)
+        run: php artisan test --parallel
+
+  # ── Next.js web build + lint ─────────────────────────────────────────────────
+  build-web:
+    name: Web — lint, type-check & build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build
+        # Use a placeholder API URL so next/image remotePatterns resolve.
+        # Real env vars are injected by each deploy workflow.
+        env:
+          NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+          NEXT_PUBLIC_APP_NAME: "Kai's Coffee"
+        run: npm run build

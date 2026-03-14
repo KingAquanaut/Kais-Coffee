@@ -1,0 +1,162 @@
+# ── Render Infrastructure as Code ────────────────────────────────────────────
+# Docs: https://render.com/docs/infrastructure-as-code
+#
+# This file defines both the staging and production API services.
+# Import it once by connecting this repo to Render (Dashboard → New → Blueprint).
+#
+# IMPORTANT — before applying this file:
+#   1. Create two Neon PostgreSQL databases (staging + production).
+#   2. Generate an APP_KEY for each environment:
+#        php artisan key:generate --show
+#   3. Set the secrets listed as `sync: false` in the Render dashboard for
+#      each service (Environment tab) — Render will NOT create these from YAML.
+#
+# After applying:
+#   - Auto-deploy is disabled (autoDeploy: false) for both services.
+#     GitHub Actions controls when deploys happen (after tests pass).
+#   - Copy each service's Deploy Hook URL from the Render dashboard and store
+#     it as RENDER_STAGING_DEPLOY_HOOK / RENDER_PROD_DEPLOY_HOOK in GitHub
+#     Secrets (Settings → Secrets → Actions).
+
+services:
+
+  # ── Staging API ─────────────────────────────────────────────────────────────
+  # Deployed from the `develop` branch by staging-deploy.yml after tests pass.
+  - type: web
+    name: kais-coffee-api-staging
+    runtime: docker
+    dockerfilePath: ./api/Dockerfile
+    dockerContext: ./api
+    branch: develop
+
+    # Disable auto-deploy — GitHub Actions triggers deploys explicitly.
+    autoDeploy: false
+
+    # Render will route traffic only once this path returns 2xx.
+    healthCheckPath: /api/v1/health
+
+    # Free plan is fine for staging; upgrade if you need more resources.
+    plan: free
+
+    envVars:
+      # ── Non-secret config ──────────────────────────────────────────────────
+      - key: APP_ENV
+        value: staging
+      - key: APP_DEBUG
+        value: "false"
+      # Set to the actual Render service URL after first deploy, e.g.:
+      #   https://kais-coffee-api-staging.onrender.com
+      - key: APP_URL
+        value: https://kais-coffee-api-staging.onrender.com
+
+      - key: LOG_CHANNEL
+        value: stack
+      - key: LOG_LEVEL
+        value: warning
+
+      - key: DB_CONNECTION
+        value: pgsql
+      # Neon requires SSL — "require" verifies the server cert is from a CA.
+      - key: DB_SSLMODE
+        value: require
+
+      # Files: keep on Render's ephemeral disk for staging (images are lost on
+      # redeploy). Switch to s3 + AWS_* vars when you need persistence.
+      - key: UPLOAD_DISK
+        value: public
+
+      # Trust Render's load balancer so $request->ip() reflects the real client.
+      - key: TRUSTED_PROXIES
+        value: "*"
+
+      # ── Secrets — set in Render dashboard, NOT here ────────────────────────
+      # Generate once: php artisan key:generate --show
+      - key: APP_KEY
+        sync: false
+
+      # Neon connection string, e.g.:
+      #   postgresql://user:pass@ep-xxx.us-east-2.aws.neon.tech/kais_coffee_staging?sslmode=require
+      # Laravel resolves DB_* from DATABASE_URL automatically when set.
+      - key: DATABASE_URL
+        sync: false
+
+      # Comma-separated origins allowed by CORS + Sanctum, e.g.:
+      #   https://staging.kaiscoffee.com
+      - key: FRONTEND_URL
+        sync: false
+
+      # Host[:port] that Sanctum issues session cookies for, e.g.:
+      #   staging.kaiscoffee.com
+      - key: SANCTUM_STATEFUL_DOMAINS
+        sync: false
+
+
+  # ── Production API ───────────────────────────────────────────────────────────
+  # Deployed from `main` by production-deploy.yml after tests pass + approval.
+  - type: web
+    name: kais-coffee-api-production
+    runtime: docker
+    dockerfilePath: ./api/Dockerfile
+    dockerContext: ./api
+    branch: main
+
+    autoDeploy: false
+
+    healthCheckPath: /api/v1/health
+
+    # Upgrade to starter or above for production — free plan sleeps after 15 min.
+    plan: starter
+
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_DEBUG
+        value: "false"
+      # Set to the actual Render service URL after first deploy, e.g.:
+      #   https://kais-coffee-api.onrender.com
+      - key: APP_URL
+        value: https://kais-coffee-api.onrender.com
+
+      - key: LOG_CHANNEL
+        value: stack
+      - key: LOG_LEVEL
+        value: error
+
+      - key: DB_CONNECTION
+        value: pgsql
+      - key: DB_SSLMODE
+        value: require
+
+      # Switch to s3 in production so uploads survive redeploys.
+      - key: UPLOAD_DISK
+        value: s3
+
+      - key: TRUSTED_PROXIES
+        value: "*"
+
+      # ── Secrets — set in Render dashboard ─────────────────────────────────
+      - key: APP_KEY
+        sync: false
+
+      # Production Neon connection string
+      - key: DATABASE_URL
+        sync: false
+
+      - key: FRONTEND_URL
+        sync: false
+
+      - key: SANCTUM_STATEFUL_DOMAINS
+        sync: false
+
+      # S3 / cloud storage — required when UPLOAD_DISK=s3
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_DEFAULT_REGION
+        sync: false
+      - key: AWS_BUCKET
+        sync: false
+      # Optional: CDN URL (e.g. https://cdn.kaiscoffee.com)
+      # - key: AWS_URL
+      #   sync: false
