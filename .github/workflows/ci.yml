@@ -20,7 +20,7 @@ concurrency:
 
 # ── Shared versions ────────────────────────────────────────────────────────────
 env:
-  PHP_VERSION: "8.3"
+  PHP_VERSION: "8.4"
   NODE_VERSION: "20"
 
 jobs:

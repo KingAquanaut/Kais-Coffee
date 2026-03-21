@@ -39,6 +39,11 @@ export default function AdminMenuPage() {
 
   const token = getToken();
 
+  // `activeCatRef` lets `load` check whether a default category has been set
+  // without adding `activeCat` to its useCallback deps (which would re-create
+  // `load` on every tab click and trigger an unwanted extra fetch).
+  const activeCatRef = useRef<number | null>(null);
+
   const load = useCallback(() => {
     if (!token) return;
     setLoading(true);
@@ -46,13 +51,16 @@ export default function AdminMenuPage() {
       .then(([cats, its]) => {
         setCategories(cats);
         setItems(its);
-        if (cats.length > 0 && !activeCat) setActiveCat(cats[0].id);
+        if (cats.length > 0 && !activeCatRef.current) {
+          activeCatRef.current = cats[0].id;
+          setActiveCat(cats[0].id);
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [token, activeCat]);
+  }, [token]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [load]);
 
   // Clean up object URL when imageFile changes or modal closes
   useEffect(() => {

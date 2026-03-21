@@ -2,7 +2,6 @@
 import {
   createContext,
   useContext,
-  useEffect,
   useState,
   type ReactNode,
 } from "react";
@@ -33,13 +32,11 @@ function isValidLang(v: string | null): v is LangCode {
 }
 
 export function LangProvider({ children }: { children: ReactNode }) {
-  const [lang, setLangState] = useState<LangCode>("en");
-
-  // Hydrate from localStorage after mount (avoids SSR mismatch)
-  useEffect(() => {
+  const [lang, setLangState] = useState<LangCode>(() => {
+    if (typeof window === "undefined") return "en";
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (isValidLang(stored)) setLangState(stored);
-  }, []);
+    return isValidLang(stored) ? stored : "en";
+  });
 
   const setLang = (l: LangCode) => {
     setLangState(l);
@@ -47,7 +44,7 @@ export function LangProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <LangContext.Provider value={{ lang, setLang, strings: translations[lang] }}>
+    <LangContext.Provider value={{ lang, setLang, strings: translations[lang] as Translations }}>
       {children}
     </LangContext.Provider>
   );

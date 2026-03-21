@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import AppLayout from "@/components/layout/AppLayout";
 import PointsCard from "@/components/ui/PointsCard";
@@ -133,7 +133,7 @@ export default function DashboardPage() {
   const [redeeming, setRedeeming] = useState(false);
   const [msg,      setMsg]      = useState<{ text: string; ok: boolean } | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     const token = getToken();
     if (!token) return;
     setLoading(true);
@@ -149,9 +149,9 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(); }, [load]);
 
   const handleRedeem = async () => {
     const token = getToken();
@@ -264,7 +264,7 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="kc-card overflow-hidden">
-                {history!.data.map((tx, i) => (
+                {history!.data.map((tx) => (
                   <TxRow
                     key={tx.id}
                     tx={tx}

@@ -33,15 +33,16 @@ export default function PurchasesPage() {
     last_page: number;
     total: number;
   } | null>(null);
-  const [loading, setLoading] = useState(true);
+  // `loadedPage` tracks which page we have data for; derive `loading` from it.
+  const [loadedPage, setLoadedPage] = useState(0);
   const [error,   setError]   = useState<string | null>(null);
   const [page,    setPage]    = useState(1);
 
+  const loading = loadedPage !== page;
+
   useEffect(() => {
     const token = getToken();
-    if (!token) return;
-    setLoading(true);
-    setError(null);
+    if (!token) return; // AppLayout auth guard handles the redirect
     accountApi.purchases(token, page)
       .then((data: Paginated<Purchase>) => {
         setPurchases(data.data);
@@ -50,9 +51,13 @@ export default function PurchasesPage() {
           last_page:    data.last_page,
           total:        data.total,
         });
+        setError(null);
+        setLoadedPage(page);
       })
-      .catch(() => setError("Could not load your purchases. Please try again."))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        setError("Could not load your purchases. Please try again.");
+        setLoadedPage(page);
+      });
   }, [page]);
 
   return (

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import AdminLayout from "@/components/layout/AdminLayout";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import { admin as adminApi, type User, type RewardAccount } from "@/lib/api";
@@ -27,12 +27,18 @@ export default function AdminCustomersPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  useEffect(() => {
-    const t = setTimeout(() => { setPage(1); load(search, 1); }, 350);
-    return () => clearTimeout(t);
-  }, [search, load]);
+  // prevSearchRef is updated inside the effect (allowed); we use it to distinguish
+  // "search changed" (debounce) from "page changed" (immediate) in a single effect.
+  const prevSearchRef = useRef("");
 
-  useEffect(() => { load(search, page); }, [page]);
+  useEffect(() => {
+    const searchChanged = prevSearchRef.current !== search;
+    prevSearchRef.current = search;
+    // Both paths go through setTimeout so setState is never called synchronously
+    // in the effect body. Search changes debounce 350 ms; page changes are instant.
+    const t = setTimeout(() => load(search, page), searchChanged ? 350 : 0);
+    return () => clearTimeout(t);
+  }, [search, page, load]);
 
   return (
     <AdminLayout>
@@ -41,7 +47,7 @@ export default function AdminCustomersPage() {
       <input
         type="text"
         value={search}
-        onChange={e => setSearch(e.target.value)}
+        onChange={e => { setSearch(e.target.value); setPage(1); }}
         placeholder="Search by name or email…"
         className="kc-input mb-6"
         style={{ maxWidth: "24rem" }}

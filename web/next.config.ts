@@ -7,10 +7,9 @@ const withPWA = require("next-pwa")({
   skipWaiting: true,
   disable: process.env.NODE_ENV === "development",
 
-  // Serve /offline when a navigation request fails (no network + not in cache)
-  fallbacks: {
-    document: "/offline",
-  },
+  // NOTE: `fallbacks.document` was removed because next-pwa@5 crashes on
+  // `precacheFallback` when built with Next.js 16. The /offline page is still
+  // reachable offline via the NetworkFirst "pages" runtime cache rule below.
 
   runtimeCaching: [
     // Google Fonts — cache-first, 1 year
@@ -90,7 +89,7 @@ const withPWA = require("next-pwa")({
 // Build next/image remotePatterns from the API URL so the same config works
 // in development (localhost:8000) and production (api.kaiscoffee.com) without
 // code changes — only NEXT_PUBLIC_API_URL needs to differ per environment.
-function buildRemotePatterns(): import("next").RemotePattern[] {
+function buildRemotePatterns() {
   const raw = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
   try {
     const u = new URL(raw);

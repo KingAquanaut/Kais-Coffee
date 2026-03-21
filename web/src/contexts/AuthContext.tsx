@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
-import { auth as authApi, ApiError, type User } from "@/lib/api";
+import { auth as authApi, type User } from "@/lib/api";
 
 const TOKEN_KEY = "kc_token";
 
@@ -21,12 +21,16 @@ type AuthContextType = AuthState & {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<AuthState>({ user: null, token: null, loading: true });
+  const [state, setState] = useState<AuthState>(() => {
+    if (typeof window === "undefined") return { user: null, token: null, loading: false };
+    const token = localStorage.getItem(TOKEN_KEY);
+    return { user: null, token, loading: !!token };
+  });
 
-  // Hydrate from localStorage on mount
+  // Validate the stored token on mount; if present, fetch the user profile.
   useEffect(() => {
     const stored = localStorage.getItem(TOKEN_KEY);
-    if (!stored) { setState(s => ({ ...s, loading: false })); return; }
+    if (!stored) return;
 
     authApi.me(stored)
       .then(user => setState({ user, token: stored, loading: false }))
