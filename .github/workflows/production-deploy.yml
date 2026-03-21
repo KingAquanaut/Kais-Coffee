@@ -87,7 +87,7 @@ jobs:
           echo "DB_PASSWORD=secret"            >> .env
 
       - run: php artisan migrate --force
-      - run: php artisan test --parallel
+      - run: php artisan test
 
   # ── 1b. Next.js build + lint ─────────────────────────────────────────────────
   build-web:
