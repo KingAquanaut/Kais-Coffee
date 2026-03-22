@@ -20,7 +20,7 @@ RUN composer run-script post-autoload-dump 2>/dev/null || true
 # ── Stage 2: Runtime image ────────────────────────────────────────────────────
 # Slim php-fpm image + nginx + supervisor.
 # Render exposes the PORT env var; nginx listens on it (default 80 on Render).
-FROM php:8.3-fpm-alpine
+FROM php:8.4-fpm-alpine
 
 # ── System packages ───────────────────────────────────────────────────────────
 RUN apk add --no-cache \
