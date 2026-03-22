@@ -27,10 +27,11 @@ until php artisan migrate --force; do
 done
 
 # ── Laravel caches ────────────────────────────────────────────────────────────
-echo "[entrypoint] Caching configuration, routes, and views..."
+echo "[entrypoint] Caching configuration, routes, views, and events..."
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
+php artisan event:cache
 
 # ── Start services ────────────────────────────────────────────────────────────
 echo "[entrypoint] Starting supervisor (nginx + php-fpm)..."

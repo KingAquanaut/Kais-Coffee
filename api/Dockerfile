@@ -23,26 +23,26 @@ RUN composer run-script post-autoload-dump 2>/dev/null || true
 # template before starting supervisor.
 FROM php:8.4-fpm-alpine
 
-# ── System packages ───────────────────────────────────────────────────────────
+# ── System packages + PHP extensions ─────────────────────────────────────────
+# Single layer: apk + docker-php-ext-install share the same build step so we
+# don't carry the libpq-dev build toolchain in a separate intermediate layer.
 RUN apk add --no-cache \
-    nginx \
-    supervisor \
-    # envsubst — renders $PORT into nginx.conf at container startup
-    gettext \
-    # curl — used by the Docker HEALTHCHECK and useful for debugging
-    curl \
-    # Postgres client — needed by pdo_pgsql
-    libpq-dev
-
-# ── PHP extensions ────────────────────────────────────────────────────────────
-RUN docker-php-ext-install \
-    pdo \
-    pdo_pgsql \
-    opcache \
-    pcntl
+        nginx \
+        supervisor \
+        gettext \
+        curl \
+        libpq-dev \
+    && docker-php-ext-install \
+        pdo \
+        pdo_pgsql \
+        opcache \
+        pcntl
 
 # ── PHP production config ─────────────────────────────────────────────────────
 COPY docker/php.ini $PHP_INI_DIR/conf.d/99-app.ini
+
+# ── php-fpm pool overrides (max_requests, worker count) ──────────────────────
+COPY docker/php-fpm-pool.conf /usr/local/etc/php-fpm.d/zzz-pool.conf
 
 # ── nginx config (template — PORT is substituted by entrypoint.sh) ────────────
 COPY docker/nginx.conf /etc/nginx/nginx.conf.template
