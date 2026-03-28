@@ -31,12 +31,14 @@ RUN apk add --no-cache \
         supervisor \
         gettext \
         curl \
+        curl-dev \
         libpq-dev \
     && docker-php-ext-install \
         pdo \
         pdo_pgsql \
         opcache \
-        pcntl
+        pcntl \
+        curl
 
 # ── PHP production config ─────────────────────────────────────────────────────
 COPY docker/php.ini $PHP_INI_DIR/conf.d/99-app.ini
