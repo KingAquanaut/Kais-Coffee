@@ -13,15 +13,10 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // ── Users ──────────────────────────────────────────────────────────
+        // ── Admin user (idempotent — safe to re-run) ──────────────────────
+        $this->call(AdminUserSeeder::class);
 
-        $admin = User::create([
-            'name'     => "Kai",
-            'email'    => 'admin@kaiscoffee.com',
-            'password' => Hash::make('password'),
-            'phone'    => '(555) 010-0001',
-            'is_admin' => true,
-        ]);
+        // ── Demo customers ────────────────────────────────────────────────
 
         $customers = [
             ['name' => 'Emma Hartwell',  'email' => 'emma@example.com',   'phone' => '(555) 100-0001'],

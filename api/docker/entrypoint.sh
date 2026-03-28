@@ -26,6 +26,13 @@ until php artisan migrate --force; do
     sleep 3
 done
 
+# ── Admin bootstrap ───────────────────────────────────────────────────────────
+# Ensures the admin account exists on every deploy. Idempotent — safe to repeat.
+# Password is set from DEFAULT_ADMIN_PASSWORD env var (only on first creation
+# or when explicitly rotating). Remove the env var after first deploy if desired.
+echo "[entrypoint] Ensuring admin user exists..."
+php artisan db:seed --class=AdminUserSeeder --force
+
 # ── Laravel caches ────────────────────────────────────────────────────────────
 echo "[entrypoint] Caching configuration, routes, views, and events..."
 php artisan config:cache
