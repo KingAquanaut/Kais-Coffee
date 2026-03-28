@@ -1,3 +1,5 @@
+import { optimized } from "@/lib/cloudinary";
+
 type Props = {
   name: string;
   imageUrl?: string | null;
@@ -49,7 +51,7 @@ export default function ItemImage({ name, imageUrl, size = 80, className = "" }:
         style={{ width: size, height: size, flexShrink: 0 }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={imageUrl} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        <img src={optimized(imageUrl, `f_auto,q_auto,w_${size * 2},h_${size * 2},c_fill`)!} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
       </div>
     );
   }

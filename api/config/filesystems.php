@@ -17,24 +17,6 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Upload Disk
-    |--------------------------------------------------------------------------
-    |
-    | The disk used by UploadService for all admin file uploads (menu item
-    | images, hero images, team photos).
-    |
-    |   Development:  UPLOAD_DISK=public  (local filesystem, served via /storage)
-    |   Production:   UPLOAD_DISK=s3      (or any other cloud driver below)
-    |
-    | When switching to cloud storage, also set the AWS_* vars in .env and
-    | run `php artisan storage:unlink` to remove the now-unused local symlink.
-    |
-    */
-
-    'upload_disk' => env('UPLOAD_DISK', 'public'),
-
-    /*
-    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |

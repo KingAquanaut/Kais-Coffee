@@ -2,16 +2,15 @@
 
 namespace App\Services;
 
+use Cloudinary\Cloudinary;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 
 /**
- * Centralised file-upload helper.
+ * Centralised image-upload helper backed by Cloudinary.
  *
- * Uses the disk named by config('filesystems.upload_disk'), which is read from
- * the UPLOAD_DISK env var.  Set it to "public" in development and to "s3" (or
- * any other cloud driver) in production.  Everything else — URL generation,
- * deletion — adjusts automatically.
+ * Every admin upload (menu items, hero images, team photos) flows through
+ * this service. The database stores only the secure URL returned by
+ * Cloudinary — no binary data touches Postgres or Render disk.
  *
  * Usage:
  *   app(UploadService::class)->store($request->file('image'), 'menu-items');
@@ -19,62 +18,81 @@ use Illuminate\Support\Facades\Storage;
  */
 class UploadService
 {
-    private string $disk;
+    private Cloudinary $cloudinary;
+    private string $rootFolder;
 
     public function __construct()
     {
-        $this->disk = config('filesystems.upload_disk', 'public');
+        $this->cloudinary = new Cloudinary([
+            'cloud' => [
+                'cloud_name' => config('cloudinary.cloud_name'),
+                'api_key'    => config('cloudinary.api_key'),
+                'api_secret' => config('cloudinary.api_secret'),
+            ],
+            'url' => ['secure' => true],
+        ]);
+
+        $this->rootFolder = config('cloudinary.folder', 'kais-coffee');
     }
 
     /**
-     * Persist an uploaded file under $directory and return its full public URL.
+     * Upload a file to Cloudinary and return its secure URL.
+     *
+     * @param  UploadedFile  $file       The uploaded file from the request.
+     * @param  string        $directory  Subfolder inside the root folder
+     *                                   (e.g. "menu-items", "pages/home").
+     * @return string  The Cloudinary secure URL for the uploaded image.
      */
     public function store(UploadedFile $file, string $directory): string
     {
-        $path = $file->store($directory, $this->disk);
+        $folder = trim("{$this->rootFolder}/{$directory}", '/');
 
-        return $this->urlFor($path);
+        $result = $this->cloudinary->uploadApi()->upload(
+            $file->getRealPath(),
+            [
+                'folder'         => $folder,
+                'resource_type'  => 'image',
+                'overwrite'      => false,
+                'unique_filename' => true,
+            ]
+        );
+
+        return $result['secure_url'];
     }
 
     /**
-     * Delete a file by the public URL that was previously returned by store().
-     * Silently does nothing if the file does not exist.
+     * Delete a Cloudinary asset by its secure URL.
+     *
+     * Extracts the public_id from the URL and calls the destroy API.
+     * Silently does nothing if the URL is not a valid Cloudinary URL.
      */
     public function delete(string $url): void
     {
-        $path = $this->pathFrom($url);
+        $publicId = $this->extractPublicId($url);
 
-        if ($path && Storage::disk($this->disk)->exists($path)) {
-            Storage::disk($this->disk)->delete($path);
+        if ($publicId) {
+            try {
+                $this->cloudinary->uploadApi()->destroy($publicId);
+            } catch (\Throwable) {
+                // Silently ignore — the asset may already be deleted or
+                // the URL may be from the old local/S3 storage.
+            }
         }
     }
 
     /**
-     * Return the full public URL for a storage path on the configured disk.
+     * Extract the Cloudinary public_id from a secure URL.
      *
-     * For the local "public" disk this is:  APP_URL . "/storage/" . $path
-     * For S3 this is:                       AWS_URL . "/" . $path   (or the native S3 URL)
-     */
-    public function urlFor(string $path): string
-    {
-        return Storage::disk($this->disk)->url($path);
-    }
-
-    // ── private ──────────────────────────────────────────────────────────────
-
-    /**
-     * Reverse urlFor(): extract the storage-relative path from a public URL.
+     * Cloudinary URLs follow this pattern:
+     *   https://res.cloudinary.com/{cloud}/image/upload/v{version}/{public_id}.{ext}
      *
-     * Works by stripping the disk's own base URL prefix, so it automatically
-     * handles port numbers in development and CDN/custom domains in production.
+     * The public_id is everything after "/upload/v{digits}/" without the extension.
      */
-    private function pathFrom(string $url): ?string
+    private function extractPublicId(string $url): ?string
     {
-        // Storage::disk()->url('') returns the base URL the disk uses (without trailing slash).
-        $base = rtrim(Storage::disk($this->disk)->url(''), '/');
-
-        if (str_starts_with($url, $base . '/')) {
-            return substr($url, strlen($base) + 1);
+        // Match: /upload/v{digits}/{public_id}.{ext}
+        if (preg_match('#/upload/v\d+/(.+)\.\w+$#', $url, $matches)) {
+            return $matches[1];
         }
 
         return null;

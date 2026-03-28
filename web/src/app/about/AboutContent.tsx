@@ -5,6 +5,7 @@
 // The smaller named exports (badges, CTA, footer) are also used directly in page.tsx.
 import Link from "next/link";
 import { useLang } from "@/contexts/LangContext";
+import { optimized } from "@/lib/cloudinary";
 import type { PageContent } from "@/lib/api";
 
 // ── Internal layout helpers (client-safe, no hooks) ────────────────────────
@@ -50,7 +51,7 @@ function BaristaCard({ name, role, photoUrl }: { name: string; role: string; pho
       {photoUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={photoUrl}
+          src={optimized(photoUrl, "f_auto,q_auto,c_fill,w_400,h_400,g_face")!}
           alt={name}
           className="kc-team-img"
           style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
@@ -288,7 +289,7 @@ export function AboutPageContent({ content }: { content: PageContent }) {
         {heroImageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={heroImageUrl}
+            src={optimized(heroImageUrl, "f_auto,q_auto,w_1600,c_limit")!}
             alt="About hero"
             className="kc-hero-bg-motion"
             style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", zIndex: 0 }}

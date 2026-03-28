@@ -86,22 +86,34 @@ const withPWA = require("next-pwa")({
   ],
 });
 
-// Build next/image remotePatterns from the API URL so the same config works
-// in development (localhost:8000) and production (api.kaiscoffee.com) without
-// code changes — only NEXT_PUBLIC_API_URL needs to differ per environment.
+// Build next/image remotePatterns for all image sources:
+//   1. Cloudinary — where all uploads now live (res.cloudinary.com)
+//   2. API server — kept for backward compat with any old /storage/ URLs
 function buildRemotePatterns() {
+  const patterns: NonNullable<NonNullable<NextConfig["images"]>["remotePatterns"]> = [
+    // Cloudinary CDN — all new uploads
+    {
+      protocol: "https" as const,
+      hostname: "res.cloudinary.com",
+      pathname: "/**",
+    },
+  ];
+
+  // Legacy: API server /storage/ paths (local dev or old S3 uploads)
   const raw = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
   try {
     const u = new URL(raw);
-    return [{
+    patterns.push({
       protocol: u.protocol.replace(":", "") as "http" | "https",
       hostname: u.hostname,
       ...(u.port ? { port: u.port } : {}),
       pathname: "/storage/**",
-    }];
+    });
   } catch {
-    return [];
+    // ignore malformed URL
   }
+
+  return patterns;
 }
 
 const nextConfig: NextConfig = {

@@ -1,5 +1,6 @@
 import PublicNav from "@/components/layout/PublicNav";
 import { HeroBadge, HeroButtons, HeroText, StampSection, PillarsSection, HomeFooter } from "./HomeContent";
+import { optimized } from "@/lib/cloudinary";
 import type { PageContent } from "@/lib/api";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
@@ -40,7 +41,7 @@ export default async function HomePage() {
         {hasPhoto ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={heroImageUrl!}
+            src={optimized(heroImageUrl, "f_auto,q_auto,w_1600,c_limit")!}
             alt=""
             aria-hidden="true"
             className="kc-hero-bg-motion"
