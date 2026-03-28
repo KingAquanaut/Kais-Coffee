@@ -20,21 +20,18 @@ class AdminUserSeeder extends Seeder
 {
     public function run(): void
     {
-        $password = env('DEFAULT_ADMIN_PASSWORD');
+        $password = env('DEFAULT_ADMIN_PASSWORD', 'password');
 
         $attributes = [
             'name'     => 'Admin',
             'is_admin' => true,
         ];
 
-        // Only set/overwrite the password when the env var is present.
-        // This means:
-        //   - First run with env var set: creates the account with that password.
-        //   - Subsequent runs without env var: updates name/is_admin but leaves
-        //     the existing password untouched.
-        //   - Subsequent runs WITH env var: resets the password (useful if you
-        //     need to rotate it after a compromise).
-        if ($password !== null) {
+        // Only set/overwrite the password when creating a new account
+        // or when DEFAULT_ADMIN_PASSWORD is explicitly set in the environment.
+        $existing = User::where('email', 'admin@kaiscoffee.com')->first();
+
+        if (!$existing || env('DEFAULT_ADMIN_PASSWORD') !== null) {
             $attributes['password'] = Hash::make($password);
         }
 
