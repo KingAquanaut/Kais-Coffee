@@ -255,11 +255,14 @@ export default function AdminMenuPage() {
           style={{ background: "rgba(26,26,26,0.5)" }}
           onClick={e => { if (e.target === e.currentTarget) closeModal(); }}
         >
-          <div className="kc-card w-full max-w-md p-6 overflow-y-auto" style={{ maxHeight: "90svh" }}>
-            <h2 className="text-xl font-bold mb-5" style={{ fontFamily: "var(--font-heading)" }}>
-              {modal.item ? "Edit Item" : "New Item"}
-            </h2>
+          <div className="kc-card w-full max-w-md flex flex-col" style={{ maxHeight: "90svh" }}>
+            <div className="p-6 pb-3">
+              <h2 className="text-xl font-bold mb-5" style={{ fontFamily: "var(--font-heading)" }}>
+                {modal.item ? "Edit Item" : "New Item"}
+              </h2>
+            </div>
 
+            <div className="px-6 pb-2 overflow-y-auto flex-1">
             {formErr && <p className="text-xs mb-3" style={{ color: "var(--kc-error)" }}>{formErr}</p>}
 
             <div className="flex flex-col gap-4">
@@ -418,7 +421,9 @@ export default function AdminMenuPage() {
               </div>
             </div>
 
-            <div className="flex gap-3 mt-6">
+            </div>
+
+            <div className="flex gap-3 p-6 pt-4" style={{ borderTop: "1px solid var(--kc-cream-dark)" }}>
               <button onClick={closeModal} className="kc-btn kc-btn-outline flex-1">Cancel</button>
               <button onClick={handleSave} disabled={saving} className="kc-btn flex-1">
                 {saving ? "Saving…" : "Save"}

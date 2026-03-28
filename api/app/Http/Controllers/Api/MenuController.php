@@ -12,7 +12,7 @@ class MenuController extends Controller
     public function categories(): JsonResponse
     {
         $categories = MenuCategory::where('is_active', true)
-            ->with(['activeItems'])
+            ->with(['active_items'])
             ->orderBy('sort_order')
             ->get();
 
