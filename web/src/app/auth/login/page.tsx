@@ -115,20 +115,22 @@ export default function LoginPage() {
           </Link>
         </p>
 
-        {/* Demo quick-fill */}
-        <div className="mt-8 pt-6" style={{ borderTop: "1px solid var(--kc-cream-dark)" }}>
-          <p className="text-xs text-center mb-3" style={{ color: "var(--kc-muted)" }}>
-            Demo credentials
-          </p>
-          <div className="grid grid-cols-2 gap-2">
-            <button type="button" onClick={fillDemo}  className="kc-btn kc-btn-outline kc-btn-sm">
-              Customer
-            </button>
-            <button type="button" onClick={fillAdmin} className="kc-btn kc-btn-outline kc-btn-sm">
-              Admin
-            </button>
+        {/* Demo quick-fill — development only */}
+        {process.env.NODE_ENV === "development" && (
+          <div className="mt-8 pt-6" style={{ borderTop: "1px solid var(--kc-cream-dark)" }}>
+            <p className="text-xs text-center mb-3" style={{ color: "var(--kc-muted)" }}>
+              Demo credentials
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button type="button" onClick={fillDemo}  className="kc-btn kc-btn-outline kc-btn-sm">
+                Customer
+              </button>
+              <button type="button" onClick={fillAdmin} className="kc-btn kc-btn-outline kc-btn-sm">
+                Admin
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
       </div>
     </div>

@@ -9,7 +9,7 @@ export default function AdminLoginPage() {
   const { login, user } = useAuth();
   const router = useRouter();
 
-  const [email,    setEmail]    = useState("admin@kaiscoffee.com");
+  const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
   const [error,    setError]    = useState<string | null>(null);
   const [loading,  setLoading]  = useState(false);
@@ -66,9 +66,11 @@ export default function AdminLoginPage() {
           </button>
         </form>
 
-        <p className="mt-6 text-xs text-center" style={{ color: "var(--kc-muted)" }}>
-          Default: admin@kaiscoffee.com / password
-        </p>
+        {process.env.NODE_ENV === "development" && (
+          <p className="mt-6 text-xs text-center" style={{ color: "var(--kc-muted)" }}>
+            Default: admin@kaiscoffee.com / password
+          </p>
+        )}
 
         <div className="mt-5 text-center">
           <Link
