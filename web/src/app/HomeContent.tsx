@@ -54,7 +54,7 @@ export function HeroText({
   return (
     <>
       <h1
-        className="text-4xl sm:text-5xl md:text-7xl font-bold"
+        className={`font-bold ${hasPhoto ? "text-3xl sm:text-4xl md:text-6xl" : "text-4xl sm:text-5xl md:text-7xl"}`}
         style={{
           fontFamily: "var(--font-heading)",
           maxWidth: "14ch",

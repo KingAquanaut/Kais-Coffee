@@ -34,8 +34,8 @@ export default async function HomePage() {
 
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
       <div
-        className="relative flex flex-col items-center justify-center text-center px-6"
-        style={{ minHeight: "100svh", overflow: "hidden" }}
+        className={`relative flex flex-col items-center text-center px-6 ${hasPhoto ? "justify-end" : "justify-center"}`}
+        style={{ minHeight: "100svh", overflow: "hidden", paddingBottom: hasPhoto ? "5.5rem" : undefined }}
       >
         {/* Background */}
         {hasPhoto ? (
@@ -58,8 +58,9 @@ export default async function HomePage() {
           />
         )}
 
+        {/* Photo overlay — light at top (faces visible), heavy at bottom (text readable) */}
         {hasPhoto && (
-          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(170deg, rgba(18,10,5,0.08) 0%, rgba(18,10,5,0.45) 50%, rgba(18,10,5,0.72) 100%)", zIndex: 1 }} />
+          <div style={{ position: "absolute", inset: 0, background: "linear-gradient(to bottom, rgba(18,10,5,0.05) 0%, rgba(18,10,5,0.15) 35%, rgba(18,10,5,0.55) 65%, rgba(18,10,5,0.78) 100%)", zIndex: 1 }} />
         )}
 
         {!hasPhoto && (
@@ -71,12 +72,17 @@ export default async function HomePage() {
         )}
 
         {/* Content */}
-        <div className="relative flex flex-col items-center" style={{ zIndex: 2, gap: "1rem", marginTop: "-3vh" }}>
+        <div className="relative flex flex-col items-center" style={{ zIndex: 2, gap: hasPhoto ? "0.75rem" : "1rem", marginTop: hasPhoto ? undefined : "-3vh" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/logo.svg"
+            src={hasPhoto ? "/logo-light.svg" : "/logo.svg"}
             alt="Kai's Coffee"
-            style={{ width: "min(260px, 62vw)", height: "auto", filter: hasPhoto ? "drop-shadow(0 4px 18px rgba(0,0,0,0.38))" : undefined, marginBottom: "0.25rem" }}
+            style={{
+              width: hasPhoto ? "min(200px, 50vw)" : "min(260px, 62vw)",
+              height: "auto",
+              filter: hasPhoto ? "drop-shadow(0 4px 18px rgba(0,0,0,0.38))" : undefined,
+              marginBottom: "0.25rem",
+            }}
           />
 
           <HeroBadge hasPhoto={hasPhoto} />
