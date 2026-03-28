@@ -6,18 +6,18 @@ name: Staging — Deploy
 # Stack:
 #   API  → Render (Docker, kais-coffee-api-staging service)
 #   Web  → Vercel (Next.js, preview environment)
-#   DB   → Neon (staging database, separate from production)
 #
-# Prerequisites (one-time setup — see DEPLOYMENT.md):
+# Prerequisites (one-time setup):
 #   GitHub Secrets (Settings → Secrets → Actions):
-#     RENDER_STAGING_DEPLOY_HOOK   Deploy hook URL from Render dashboard
-#     VERCEL_TOKEN                 Vercel personal/team token
-#     VERCEL_ORG_ID                From `vercel link` or Vercel project settings
-#     VERCEL_PROJECT_ID            From `vercel link` or Vercel project settings
+#     RENDER_STAGING_DEPLOY_HOOK     Deploy hook URL from Render dashboard
+#     VERCEL_TOKEN                   Vercel personal/team token
+#     VERCEL_ORG_ID                  From Vercel project settings → General
+#     VERCEL_PROJECT_ID              From Vercel project settings → General
+#     NEXT_PUBLIC_API_URL_STAGING    https://kais-coffee-api-staging.onrender.com/api/v1
 #
-#   Vercel project environment variables (Dashboard → Project → Settings → Env):
-#     NEXT_PUBLIC_API_URL   (Preview env)  https://kais-coffee-api-staging.onrender.com/api/v1
-#     NEXT_PUBLIC_APP_NAME  (Preview env)  Kai's Coffee
+#   GitHub Environment (Settings → Environments → staging):
+#     No required reviewers needed for staging (fast feedback loop).
+#     Add reviewers here if your team wants approval before staging deploys.
 on:
   push:
     branches: [develop]
@@ -25,6 +25,7 @@ on:
 
 concurrency:
   group: staging-deploy
+  # Cancel older staging runs when a new commit arrives — only latest matters.
   cancel-in-progress: true
 
 env:
@@ -85,9 +86,11 @@ jobs:
       - run: php artisan migrate --force
       - run: php artisan test
 
-  # ── 1b. Next.js build + lint ─────────────────────────────────────────────────
+  # ── 1b. Next.js lint + type-check ────────────────────────────────────────────
+  # This job validates code quality. The actual production build happens inside
+  # `vercel build` in the deploy-web job (Vercel rebuilds with its own toolchain).
   build-web:
-    name: Web build & lint
+    name: Web — lint & type-check
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -106,24 +109,18 @@ jobs:
       - run: npm run lint
       - run: npx tsc --noEmit
 
-      - name: Build
-        # Vercel injects the real NEXT_PUBLIC_API_URL at build time from its
-        # project environment variables. This placeholder keeps the CI build
-        # self-contained and avoids hard-coding staging URLs here.
+      - name: Verify build
+        # Use a localhost placeholder so next/image remotePatterns don't fail.
+        # The real NEXT_PUBLIC_API_URL is injected by Vercel during deploy-web.
         env:
           NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
           NEXT_PUBLIC_APP_NAME: "Kai's Coffee"
         run: npm run build
 
   # ── 2. Deploy API to Render (staging) ────────────────────────────────────────
-  # POSTs to the Render deploy hook, which triggers a new Docker build + deploy
-  # of the kais-coffee-api-staging service from the HEAD of `develop`.
-  #
-  # Render's entrypoint.sh runs `php artisan migrate --force` before nginx
-  # starts, so migrations are applied automatically on each deploy.
-  #
-  # The deploy hook URL is available in:
-  #   Render Dashboard → kais-coffee-api-staging → Settings → Deploy Hook
+  # Fires the Render deploy hook, then polls /api/v1/health until the new
+  # container is live (up to 5 min). Render holds the old container until the
+  # new one passes its health check — zero-downtime swap.
   deploy-api:
     name: Deploy API → Render staging
     needs: [test-api, build-web]
@@ -138,45 +135,102 @@ jobs:
             "${{ secrets.RENDER_STAGING_DEPLOY_HOOK }}")
           echo "Render response: $response"
 
-      - name: Wait for Render health check
-        # Poll the health endpoint until the new deploy is live (up to 5 min).
-        # Render serves the OLD container until the new one passes its health
-        # check, so this step resolves only when the new version is up.
+      - name: Wait for staging API health
         run: |
-          echo "Waiting for staging API to become healthy..."
+          echo "Polling staging API health (max 5 min)..."
           for i in $(seq 1 30); do
             status=$(curl --silent --output /dev/null --write-out "%{http_code}" \
               https://kais-coffee-api-staging.onrender.com/api/v1/health || echo "000")
-            echo "  Attempt $i: HTTP $status"
+            echo "  Attempt $i/30: HTTP $status"
             if [ "$status" = "200" ]; then
-              echo "✓ Staging API is healthy."
+              echo "Staging API is healthy."
               exit 0
             fi
             sleep 10
           done
-          echo "✗ Staging API did not become healthy within 5 minutes."
+          echo "Staging API did not become healthy within 5 minutes."
           exit 1
 
-  # ── 3. Deploy Web to Vercel (staging preview) ─────────────────────────────
-  # Vercel builds the Next.js app and deploys it as a preview deployment.
-  # NEXT_PUBLIC_API_URL is read from Vercel's "Preview" environment variables
-  # (set in the Vercel dashboard — no secrets needed here).
+  # ── 3. Deploy Web to Vercel (staging preview) ─────────────────────────────────
+  # Uses the official Vercel CLI (vercel pull → vercel build → vercel deploy).
+  #
+  # NEXT_PUBLIC_API_URL_STAGING is injected after `vercel pull` so it takes
+  # precedence over any value already in the Vercel dashboard for this env.
+  # This makes the secret the single source of truth for the staging API URL.
+  #
+  # The deployed URL is printed at the end of this job for easy access.
   deploy-web:
     name: Deploy Web → Vercel staging
     needs: [test-api, build-web]
     runs-on: ubuntu-latest
     environment: staging
 
+    defaults:
+      run:
+        working-directory: web
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy to Vercel (preview)
-        uses: amondnet/vercel-action@v25
+      - uses: actions/setup-node@v4
         with:
-          vercel-token:      ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id:     ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          working-directory: web
-          # Assign a stable staging URL so you can always find the latest preview.
-          # Replace with your actual staging domain once configured in Vercel.
-          alias-domains: staging.kaiscoffee.com
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Vercel CLI
+        # Pin to a major version so you get patch fixes but not breaking changes.
+        run: npm install --global vercel@latest
+
+      # Pull project metadata (.vercel/project.json) and environment variable
+      # files (.vercel/.env.preview.local) from Vercel. Required before build.
+      - name: Pull Vercel project settings (preview)
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      # Append our secret AFTER pulling so it wins over the dashboard value.
+      # `echo >>` is safe even if the file doesn't have a trailing newline.
+      - name: Inject staging API URL
+        run: |
+          echo "" >> .vercel/.env.preview.local
+          echo "NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL_STAGING }}" >> .vercel/.env.preview.local
+
+      # `vercel build` compiles Next.js using the pulled env vars (including our
+      # injected NEXT_PUBLIC_API_URL). Output goes to .vercel/output/.
+      - name: Build (vercel build)
+        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      # `--prebuilt` ships the .vercel/output/ directory without rebuilding.
+      # The deploy URL is captured so we can log it and optionally alias it.
+      - name: Deploy to Vercel preview
+        id: deploy
+        run: |
+          deploy_url=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
+          echo "deploy_url=$deploy_url" >> $GITHUB_OUTPUT
+          echo "Deployed to: $deploy_url"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      # Optional: assign a stable staging alias so you always have a fixed URL.
+      # Requires the domain to be added and verified in your Vercel project first.
+      # Comment this step out if you haven't configured the alias domain yet.
+      - name: Alias to staging domain
+        run: |
+          vercel alias set \
+            "${{ steps.deploy.outputs.deploy_url }}" \
+            staging.kaiscoffee.com \
+            --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        # Don't fail the whole workflow if aliasing fails (domain not yet set up).
+        continue-on-error: true

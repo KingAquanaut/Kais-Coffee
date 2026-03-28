@@ -2,25 +2,25 @@ name: Production — Deploy
 
 # ── Trigger ────────────────────────────────────────────────────────────────────
 # Runs on push to `main` and on manual dispatch.
-# The `deploy-api` and `deploy-web` jobs are gated by the "production" GitHub
-# Environment — configure Required Reviewers there to enforce manual approval
-# before any production deploy goes live.
+#
+# The `deploy-api` and `deploy-web` jobs sit behind the "production" GitHub
+# Environment. Configure Required Reviewers there to enforce manual approval
+# before any production deploy goes live (Settings → Environments → production).
 #
 # Stack:
 #   API  → Render (Docker, kais-coffee-api-production service)
 #   Web  → Vercel (Next.js, production environment)
-#   DB   → Neon (production database)
 #
-# Prerequisites (one-time setup — see DEPLOYMENT.md):
+# Prerequisites (one-time setup):
 #   GitHub Secrets (Settings → Secrets → Actions):
-#     RENDER_PROD_DEPLOY_HOOK   Deploy hook URL from Render dashboard
-#     VERCEL_TOKEN              Vercel personal/team token
-#     VERCEL_ORG_ID             From `vercel link` or Vercel project settings
-#     VERCEL_PROJECT_ID         From `vercel link` or Vercel project settings
+#     RENDER_PROD_DEPLOY_HOOK      Deploy hook URL from Render dashboard
+#     VERCEL_TOKEN                 Vercel personal/team token
+#     VERCEL_ORG_ID                From Vercel project settings → General
+#     VERCEL_PROJECT_ID            From Vercel project settings → General
+#     NEXT_PUBLIC_API_URL_PROD     https://kais-coffee-api.onrender.com/api/v1
 #
-#   Vercel project environment variables (Dashboard → Project → Settings → Env):
-#     NEXT_PUBLIC_API_URL   (Production env)  https://kais-coffee-api.onrender.com/api/v1
-#     NEXT_PUBLIC_APP_NAME  (Production env)  Kai's Coffee
+#   GitHub Environment (Settings → Environments → production):
+#     Add Required Reviewers to gate all production deploys behind approval.
 on:
   push:
     branches: [main]
@@ -89,9 +89,9 @@ jobs:
       - run: php artisan migrate --force
       - run: php artisan test
 
-  # ── 1b. Next.js build + lint ─────────────────────────────────────────────────
+  # ── 1b. Next.js lint + type-check ────────────────────────────────────────────
   build-web:
-    name: Web build & lint
+    name: Web — lint & type-check
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -110,22 +110,22 @@ jobs:
       - run: npm run lint
       - run: npx tsc --noEmit
 
-      - name: Build
+      - name: Verify build
+        # Placeholder URL keeps the CI build self-contained.
+        # The real NEXT_PUBLIC_API_URL is injected by Vercel during deploy-web.
         env:
           NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
           NEXT_PUBLIC_APP_NAME: "Kai's Coffee"
         run: npm run build
 
   # ── 2. Deploy API to Render (production) ─────────────────────────────────────
-  # Pauses here for manual approval if the "production" GitHub Environment has
-  # Required Reviewers configured (Settings → Environments → production).
+  # This job is gated by the "production" GitHub Environment.
+  # If Required Reviewers are configured, the workflow pauses here until
+  # a reviewer approves — no code reaches prod without human sign-off.
   #
-  # After approval, POSTs to the Render deploy hook. Render builds a new Docker
-  # image from main, runs entrypoint.sh (which migrates the production Neon DB),
-  # and shifts traffic once the health check passes.
-  #
-  # The deploy hook URL is available in:
-  #   Render Dashboard → kais-coffee-api-production → Settings → Deploy Hook
+  # After approval, Render builds a new Docker image from main, runs
+  # entrypoint.sh (php artisan migrate --force), and shifts traffic once
+  # the health check passes. The old container stays live until then.
   deploy-api:
     name: Deploy API → Render production
     needs: [test-api, build-web]
@@ -140,44 +140,84 @@ jobs:
             "${{ secrets.RENDER_PROD_DEPLOY_HOOK }}")
           echo "Render response: $response"
 
-      - name: Wait for Render health check
-        # Poll until the new production container is serving traffic.
-        # Render holds the old container live until the new one is healthy,
-        # so this is a zero-downtime wait step.
+      - name: Wait for production API health
+        # Poll up to 6 min (36 × 10s). Production deploy on Render starter plan
+        # is typically 2–4 min including Docker build + migration.
         run: |
-          echo "Waiting for production API to become healthy..."
+          echo "Polling production API health (max 6 min)..."
           for i in $(seq 1 36); do
             status=$(curl --silent --output /dev/null --write-out "%{http_code}" \
               https://kais-coffee-api.onrender.com/api/v1/health || echo "000")
-            echo "  Attempt $i: HTTP $status"
+            echo "  Attempt $i/36: HTTP $status"
             if [ "$status" = "200" ]; then
-              echo "✓ Production API is healthy."
+              echo "Production API is healthy."
               exit 0
             fi
             sleep 10
           done
-          echo "✗ Production API did not become healthy within 6 minutes."
+          echo "Production API did not become healthy within 6 minutes."
           exit 1
 
   # ── 3. Deploy Web to Vercel (production) ──────────────────────────────────────
-  # Vercel builds and promotes the deployment to production using
-  # NEXT_PUBLIC_API_URL from Vercel's "Production" environment variables.
-  # Runs in parallel with deploy-api (both need tests to pass, not each other).
+  # Uses the official Vercel CLI (vercel pull → vercel build → vercel deploy --prod).
+  # Runs in parallel with deploy-api — both need tests to pass, not each other.
+  #
+  # NEXT_PUBLIC_API_URL_PROD is injected after `vercel pull` so it takes
+  # precedence over any value already in the Vercel dashboard. This makes
+  # the GitHub Secret the single source of truth for the production API URL.
   deploy-web:
     name: Deploy Web → Vercel production
     needs: [test-api, build-web]
     runs-on: ubuntu-latest
     environment: production   # same gate — both jobs require approval
 
+    defaults:
+      run:
+        working-directory: web
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy to Vercel (production)
-        uses: amondnet/vercel-action@v25
+      - uses: actions/setup-node@v4
         with:
-          vercel-token:      ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id:     ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          working-directory: web
-          # --prod promotes this deployment to kaiscoffee.com
-          vercel-args: --prod
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      # Pull project metadata and the production environment variable file
+      # (.vercel/.env.production.local) from Vercel. Required before build.
+      - name: Pull Vercel project settings (production)
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      # Append our secret AFTER pulling so it wins over the dashboard value.
+      - name: Inject production API URL
+        run: |
+          echo "" >> .vercel/.env.production.local
+          echo "NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL_PROD }}" >> .vercel/.env.production.local
+
+      # Build using the pulled env vars. Output goes to .vercel/output/.
+      - name: Build (vercel build --prod)
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      # Ship the prebuilt output. --prod promotes this to the production domain.
+      - name: Deploy to Vercel production
+        id: deploy
+        run: |
+          deploy_url=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          echo "deploy_url=$deploy_url" >> $GITHUB_OUTPUT
+          echo "Deployed to: $deploy_url"
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
