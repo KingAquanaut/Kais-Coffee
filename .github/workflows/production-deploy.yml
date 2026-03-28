@@ -184,8 +184,11 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - name: Install dependencies (includes vercel CLI)
-        run: npm ci && npm install vercel@latest
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Vercel CLI (local)
+        run: npm install vercel@latest
 
       - name: Debug — verify toolchain
         run: |
@@ -193,12 +196,12 @@ jobs:
           echo "npm:  $(npm -v)"
           echo "node: $(which node)"
           echo "npm:  $(which npm)"
-          echo "vercel: $(npx vercel --version)"
+          echo "vercel: $(npm exec -- vercel --version)"
 
       # Pull project metadata and the production environment variable file
       # (.vercel/.env.production.local) from Vercel. Required before build.
       - name: Pull Vercel project settings (production)
-        run: npx vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        run: npm exec -- vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -213,7 +216,7 @@ jobs:
       # VERCEL_BUILD_SKIP_INSTALL=1 prevents vercel from running `npm ci`
       # again inside its own subprocess (which is where spawn npm ENOENT fires).
       - name: Build (vercel build --prod)
-        run: npx vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: npm exec -- vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -223,7 +226,7 @@ jobs:
       - name: Deploy to Vercel production
         id: deploy
         run: |
-          deploy_url=$(npx vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          deploy_url=$(npm exec -- vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
           echo "deploy_url=$deploy_url" >> $GITHUB_OUTPUT
           echo "Deployed to: $deploy_url"
         env:
