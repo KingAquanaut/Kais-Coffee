@@ -184,16 +184,21 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install dependencies (includes vercel CLI)
+        run: npm ci && npm install vercel@latest
 
-      - name: Install Vercel CLI
-        run: npm install --global vercel@latest
+      - name: Debug — verify toolchain
+        run: |
+          echo "node: $(node -v)"
+          echo "npm:  $(npm -v)"
+          echo "node: $(which node)"
+          echo "npm:  $(which npm)"
+          echo "vercel: $(npx vercel --version)"
 
       # Pull project metadata and the production environment variable file
       # (.vercel/.env.production.local) from Vercel. Required before build.
       - name: Pull Vercel project settings (production)
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+        run: npx vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -205,17 +210,20 @@ jobs:
           echo "NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL_PROD }}" >> .vercel/.env.production.local
 
       # Build using the pulled env vars. Output goes to .vercel/output/.
+      # VERCEL_BUILD_SKIP_INSTALL=1 prevents vercel from running `npm ci`
+      # again inside its own subprocess (which is where spawn npm ENOENT fires).
       - name: Build (vercel build --prod)
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: npx vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_BUILD_SKIP_INSTALL: 1
 
       # Ship the prebuilt output. --prod promotes this to the production domain.
       - name: Deploy to Vercel production
         id: deploy
         run: |
-          deploy_url=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          deploy_url=$(npx vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
           echo "deploy_url=$deploy_url" >> $GITHUB_OUTPUT
           echo "Deployed to: $deploy_url"
         env:

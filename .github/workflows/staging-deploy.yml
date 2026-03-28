@@ -178,17 +178,21 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install dependencies (includes vercel CLI)
+        run: npm ci && npm install vercel@latest
 
-      - name: Install Vercel CLI
-        # Pin to a major version so you get patch fixes but not breaking changes.
-        run: npm install --global vercel@latest
+      - name: Debug — verify toolchain
+        run: |
+          echo "node: $(node -v)"
+          echo "npm:  $(npm -v)"
+          echo "node: $(which node)"
+          echo "npm:  $(which npm)"
+          echo "vercel: $(npx vercel --version)"
 
       # Pull project metadata (.vercel/project.json) and environment variable
       # files (.vercel/.env.preview.local) from Vercel. Required before build.
       - name: Pull Vercel project settings (preview)
-        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+        run: npx vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
@@ -202,18 +206,21 @@ jobs:
 
       # `vercel build` compiles Next.js using the pulled env vars (including our
       # injected NEXT_PUBLIC_API_URL). Output goes to .vercel/output/.
+      # VERCEL_BUILD_SKIP_INSTALL=1 prevents vercel from running `npm ci`
+      # again inside its own subprocess (which is where spawn npm ENOENT fires).
       - name: Build (vercel build)
-        run: vercel build --token=${{ secrets.VERCEL_TOKEN }}
+        run: npx vercel build --token=${{ secrets.VERCEL_TOKEN }}
         env:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          VERCEL_BUILD_SKIP_INSTALL: 1
 
       # `--prebuilt` ships the .vercel/output/ directory without rebuilding.
       # The deploy URL is captured so we can log it and optionally alias it.
       - name: Deploy to Vercel preview
         id: deploy
         run: |
-          deploy_url=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
+          deploy_url=$(npx vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
           echo "deploy_url=$deploy_url" >> $GITHUB_OUTPUT
           echo "Deployed to: $deploy_url"
         env:
@@ -225,7 +232,7 @@ jobs:
       # Comment this step out if you haven't configured the alias domain yet.
       - name: Alias to staging domain
         run: |
-          vercel alias set \
+          npx vercel alias set \
             "${{ steps.deploy.outputs.deploy_url }}" \
             staging.kaiscoffee.com \
             --token=${{ secrets.VERCEL_TOKEN }}
