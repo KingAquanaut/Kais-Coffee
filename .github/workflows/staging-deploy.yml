@@ -152,13 +152,12 @@ jobs:
           exit 1
 
   # ── 3. Deploy Web to Vercel (staging preview) ─────────────────────────────────
-  # Uses the official Vercel CLI (vercel pull → vercel build → vercel deploy).
-  #
-  # NEXT_PUBLIC_API_URL_STAGING is injected after `vercel pull` so it takes
-  # precedence over any value already in the Vercel dashboard for this env.
-  # This makes the secret the single source of truth for the staging API URL.
-  #
+  # Triggers a remote preview build+deploy on Vercel's infrastructure.
   # The deployed URL is printed at the end of this job for easy access.
+  #
+  # Environment variables (NEXT_PUBLIC_API_URL, etc.) must be configured in
+  # the Vercel dashboard (Settings → Environment Variables → Preview).
+  # Local .env injection does not apply to remote builds.
   deploy-web:
     name: Deploy Web → Vercel staging
     needs: [test-api, build-web]
@@ -175,55 +174,22 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: web/package-lock.json
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Vercel CLI (local)
+      - name: Install Vercel CLI
         run: npm install vercel@latest
 
       - name: Debug — verify toolchain
         run: |
           echo "node: $(node -v)"
           echo "npm:  $(npm -v)"
-          echo "node: $(which node)"
-          echo "npm:  $(which npm)"
-          echo "vercel: $(npm exec -- vercel --version)"
+          echo "vercel: $(npx vercel --version)"
 
-      # Pull project metadata (.vercel/project.json) and environment variable
-      # files (.vercel/.env.preview.local) from Vercel. Required before build.
-      - name: Pull Vercel project settings (preview)
-        run: npm exec -- vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
-      # Append our secret AFTER pulling so it wins over the dashboard value.
-      # `echo >>` is safe even if the file doesn't have a trailing newline.
-      - name: Inject staging API URL
-        run: |
-          echo "" >> .vercel/.env.preview.local
-          echo "NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL_STAGING }}" >> .vercel/.env.preview.local
-
-      # `vercel build` compiles Next.js using the pulled env vars (including our
-      # injected NEXT_PUBLIC_API_URL). Output goes to .vercel/output/.
-      # VERCEL_BUILD_SKIP_INSTALL=1 prevents vercel from running `npm ci`
-      # again inside its own subprocess (which is where spawn npm ENOENT fires).
-      - name: Build (vercel build)
-        run: npm exec -- vercel build --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          VERCEL_BUILD_SKIP_INSTALL: 1
-
-      # `--prebuilt` ships the .vercel/output/ directory without rebuilding.
-      # The deploy URL is captured so we can log it and optionally alias it.
+      # Remote deploy: Vercel pulls the repo, installs deps, and builds
+      # on its own infrastructure. No --prod flag = preview deployment.
       - name: Deploy to Vercel preview
         id: deploy
         run: |
-          deploy_url=$(npm exec -- vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
+          deploy_url=$(npx vercel deploy --yes --token=${{ secrets.VERCEL_TOKEN }})
           echo "deploy_url=$deploy_url" >> $GITHUB_OUTPUT
           echo "Deployed to: $deploy_url"
         env:
@@ -232,10 +198,9 @@ jobs:
 
       # Optional: assign a stable staging alias so you always have a fixed URL.
       # Requires the domain to be added and verified in your Vercel project first.
-      # Comment this step out if you haven't configured the alias domain yet.
       - name: Alias to staging domain
         run: |
-          npm exec -- vercel alias set \
+          npx vercel alias set \
             "${{ steps.deploy.outputs.deploy_url }}" \
             staging.kaiscoffee.com \
             --token=${{ secrets.VERCEL_TOKEN }}

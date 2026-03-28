@@ -159,12 +159,18 @@ jobs:
           exit 1
 
   # ── 3. Deploy Web to Vercel (production) ──────────────────────────────────────
-  # Uses the official Vercel CLI (vercel pull → vercel build → vercel deploy --prod).
+  # Triggers a remote production build+deploy on Vercel's infrastructure.
   # Runs in parallel with deploy-api — both need tests to pass, not each other.
   #
-  # NEXT_PUBLIC_API_URL_PROD is injected after `vercel pull` so it takes
-  # precedence over any value already in the Vercel dashboard. This makes
-  # the GitHub Secret the single source of truth for the production API URL.
+  # Why remote build (not local `vercel build`)?
+  #   `vercel build` spawns its own npm subprocess to install dependencies,
+  #   which fails intermittently in GitHub Actions with `spawn npm ENOENT`.
+  #   Remote builds avoid this entirely — Vercel handles install + build
+  #   on its own servers using its own Node/npm toolchain.
+  #
+  # Environment variables (NEXT_PUBLIC_API_URL, etc.) must be configured in
+  # the Vercel dashboard (Settings → Environment Variables → Production).
+  # Local .env injection does not apply to remote builds.
   deploy-web:
     name: Deploy Web → Vercel production
     needs: [test-api, build-web]
@@ -181,52 +187,22 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: npm
-          cache-dependency-path: web/package-lock.json
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Vercel CLI (local)
+      - name: Install Vercel CLI
         run: npm install vercel@latest
 
       - name: Debug — verify toolchain
         run: |
           echo "node: $(node -v)"
           echo "npm:  $(npm -v)"
-          echo "node: $(which node)"
-          echo "npm:  $(which npm)"
-          echo "vercel: $(npm exec -- vercel --version)"
+          echo "vercel: $(npx vercel --version)"
 
-      # Pull project metadata and the production environment variable file
-      # (.vercel/.env.production.local) from Vercel. Required before build.
-      - name: Pull Vercel project settings (production)
-        run: npm exec -- vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-
-      # Append our secret AFTER pulling so it wins over the dashboard value.
-      - name: Inject production API URL
-        run: |
-          echo "" >> .vercel/.env.production.local
-          echo "NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL_PROD }}" >> .vercel/.env.production.local
-
-      # Build using the pulled env vars. Output goes to .vercel/output/.
-      # VERCEL_BUILD_SKIP_INSTALL=1 prevents vercel from running `npm ci`
-      # again inside its own subprocess (which is where spawn npm ENOENT fires).
-      - name: Build (vercel build --prod)
-        run: npm exec -- vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
-          VERCEL_BUILD_SKIP_INSTALL: 1
-
-      # Ship the prebuilt output. --prod promotes this to the production domain.
+      # Remote deploy: Vercel pulls the repo, installs deps, and builds
+      # on its own infrastructure. --prod promotes to the production domain.
       - name: Deploy to Vercel production
         id: deploy
         run: |
-          deploy_url=$(npm exec -- vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          deploy_url=$(npx vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }})
           echo "deploy_url=$deploy_url" >> $GITHUB_OUTPUT
           echo "Deployed to: $deploy_url"
         env:
