@@ -35,12 +35,12 @@ class DatabaseSeeder extends Seeder
                 'phone'    => $data['phone'],
             ]);
 
-            $pts = fake()->numberBetween(0, 95);
+            $pts = rand(0, 95);
 
             RewardAccount::create([
                 'user_id'        => $user->id,
                 'points_balance' => $pts,
-                'lifetime_points'=> $pts + fake()->numberBetween(0, 100),
+                'lifetime_points'=> $pts + rand(0, 100),
             ]);
         }
 
