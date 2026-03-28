@@ -177,9 +177,10 @@ jobs:
     runs-on: ubuntu-latest
     environment: production   # same gate — both jobs require approval
 
-    defaults:
-      run:
-        working-directory: web
+    # No job-level working-directory. The Vercel project's Root Directory
+    # is set to "web" in the dashboard — running `vercel deploy` from the
+    # repo root lets Vercel resolve that to the correct path. Running from
+    # web/ would double it to web/web and fail.
 
     steps:
       - uses: actions/checkout@v4
@@ -188,21 +189,26 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      # Global install is safe here — we only call `vercel deploy` which
+      # triggers a remote build. No local subprocess spawning (the cause
+      # of the old `spawn npm ENOENT`).
       - name: Install Vercel CLI
-        run: npm install vercel@latest
+        run: npm install --global vercel@latest
 
       - name: Debug — verify toolchain
         run: |
-          echo "node: $(node -v)"
-          echo "npm:  $(npm -v)"
-          echo "vercel: $(npx vercel --version)"
+          echo "node:    $(node -v)"
+          echo "npm:     $(npm -v)"
+          echo "vercel:  $(vercel --version)"
+          echo "cwd:     $(pwd)"
+          echo "ls web/: $(ls web/)"
 
-      # Remote deploy: Vercel pulls the repo, installs deps, and builds
-      # on its own infrastructure. --prod promotes to the production domain.
+      # Remote deploy from repo root. Vercel reads its Root Directory
+      # setting ("web") and builds only that subdirectory on its own infra.
       - name: Deploy to Vercel production
         id: deploy
         run: |
-          deploy_url=$(npx vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }})
+          deploy_url=$(vercel deploy --prod --yes --token=${{ secrets.VERCEL_TOKEN }})
           echo "deploy_url=$deploy_url" >> $GITHUB_OUTPUT
           echo "Deployed to: $deploy_url"
         env:

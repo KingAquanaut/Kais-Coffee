@@ -164,9 +164,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: staging
 
-    defaults:
-      run:
-        working-directory: web
+    # No job-level working-directory — see production-deploy.yml comment.
 
     steps:
       - uses: actions/checkout@v4
@@ -176,20 +174,22 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install Vercel CLI
-        run: npm install vercel@latest
+        run: npm install --global vercel@latest
 
       - name: Debug — verify toolchain
         run: |
-          echo "node: $(node -v)"
-          echo "npm:  $(npm -v)"
-          echo "vercel: $(npx vercel --version)"
+          echo "node:    $(node -v)"
+          echo "npm:     $(npm -v)"
+          echo "vercel:  $(vercel --version)"
+          echo "cwd:     $(pwd)"
+          echo "ls web/: $(ls web/)"
 
-      # Remote deploy: Vercel pulls the repo, installs deps, and builds
-      # on its own infrastructure. No --prod flag = preview deployment.
+      # Remote deploy from repo root. Vercel reads its Root Directory
+      # setting ("web") and builds only that subdirectory on its own infra.
       - name: Deploy to Vercel preview
         id: deploy
         run: |
-          deploy_url=$(npx vercel deploy --yes --token=${{ secrets.VERCEL_TOKEN }})
+          deploy_url=$(vercel deploy --yes --token=${{ secrets.VERCEL_TOKEN }})
           echo "deploy_url=$deploy_url" >> $GITHUB_OUTPUT
           echo "Deployed to: $deploy_url"
         env:
@@ -200,7 +200,7 @@ jobs:
       # Requires the domain to be added and verified in your Vercel project first.
       - name: Alias to staging domain
         run: |
-          npx vercel alias set \
+          vercel alias set \
             "${{ steps.deploy.outputs.deploy_url }}" \
             staging.kaiscoffee.com \
             --token=${{ secrets.VERCEL_TOKEN }}
