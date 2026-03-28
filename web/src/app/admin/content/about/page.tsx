@@ -354,7 +354,7 @@ export default function AdminAboutPage() {
         </div>
 
         <p className="text-xs" style={{ color: "var(--kc-muted)" }}>
-          JPEG, PNG, WebP or GIF · max 5 MB. Displayed as the hero background on the About page.
+          JPEG, PNG, WebP or GIF · max 20 MB. Displayed as the hero background on the About page.
         </p>
 
         {imageMsg && (

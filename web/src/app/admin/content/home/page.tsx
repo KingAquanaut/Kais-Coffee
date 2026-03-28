@@ -245,7 +245,7 @@ export default function AdminHomePage() {
         </div>
 
         <p className="text-xs" style={{ color: "var(--kc-muted)" }}>
-          JPEG, PNG, WebP or GIF · max 5 MB. Displayed as the full-bleed hero background on the home page. When no image is set, a soft blue gradient is shown instead.
+          JPEG, PNG, WebP or GIF · max 20 MB. Displayed as the full-bleed hero background on the home page. When no image is set, a soft blue gradient is shown instead.
         </p>
 
         {imageMsg && <p className="text-xs" style={{ color: "var(--kc-success)" }}>{imageMsg}</p>}

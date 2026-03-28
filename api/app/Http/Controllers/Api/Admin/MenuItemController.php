@@ -86,7 +86,7 @@ class MenuItemController extends Controller
     public function uploadImage(Request $request, MenuItem $menuItem, UploadService $uploads): JsonResponse
     {
         $request->validate([
-            'image' => ['required', 'file', 'image', 'max:5120', 'mimes:jpeg,png,gif,webp'],
+            'image' => ['required', 'file', 'image', 'max:20480', 'mimes:jpeg,png,gif,webp'],
         ]);
 
         if ($menuItem->image_url) {

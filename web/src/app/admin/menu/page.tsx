@@ -333,7 +333,7 @@ export default function AdminMenuPage() {
                   </div>
                 </div>
                 <p className="text-xs mt-2" style={{ color: "var(--kc-muted)" }}>
-                  JPEG, PNG, WebP or GIF · max 5 MB
+                  JPEG, PNG, WebP or GIF · max 20 MB
                 </p>
               </div>
 
