@@ -239,7 +239,7 @@ export default function PublicNav({ overlayHero = false }: PublicNavProps) {
       <div className="flex items-center gap-3">
         <Link
           href="/about"
-          className="hidden sm:inline text-sm font-semibold"
+          className="text-sm font-semibold"
           style={{
             color: ghost ? "rgba(255,255,255,0.88)" : "var(--kc-black)",
             textDecoration: "none",
