@@ -75,7 +75,7 @@ export default async function HomePage() {
         <div className="relative flex flex-col items-center" style={{ zIndex: 2, gap: hasPhoto ? "0.75rem" : "1rem", marginTop: hasPhoto ? undefined : "-3vh" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/logo.jpg"
+            src="/logo.png"
             alt="Kai's Coffee"
             style={{
               width: hasPhoto ? "min(200px, 50vw)" : "min(260px, 62vw)",

@@ -60,7 +60,7 @@ export default function LoginPage() {
         </Link>
 
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.jpg" alt="Kai's Coffee" className="mx-auto mb-6" style={{ width: "min(200px, 60vw)", height: "auto" }} />
+        <img src="/logo.png" alt="Kai's Coffee" className="mx-auto mb-6" style={{ width: "min(200px, 60vw)", height: "auto" }} />
 
         <h1 className="text-3xl font-bold mb-1" style={{ fontFamily: "var(--font-heading)" }}>
           Welcome back

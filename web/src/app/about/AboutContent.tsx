@@ -325,7 +325,7 @@ export function AboutPageContent({ content }: { content: PageContent }) {
         <div className="relative flex flex-col items-center gap-4" style={{ zIndex: 2 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/logo.jpg"
+            src="/logo.png"
             alt="Kai's Coffee"
             style={{
               width: "min(260px, 70vw)", height: "auto", marginBottom: "0.5rem",

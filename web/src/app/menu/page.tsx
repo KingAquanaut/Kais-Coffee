@@ -24,7 +24,7 @@ export default async function MenuPage() {
         {/* Plain <img> — SVGs in /public don't need Next.js optimisation */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/logo.jpg"
+          src="/logo.png"
           alt="Kai's Coffee"
           style={{ width: "min(380px, 90vw)", height: "auto" }}
         />
