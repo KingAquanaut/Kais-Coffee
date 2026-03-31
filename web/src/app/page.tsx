@@ -68,14 +68,14 @@ export default async function HomePage() {
         )}
 
         {!hasPhoto && (
-          <div aria-hidden="true" style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: 640, height: 640, borderRadius: "50%", background: "radial-gradient(circle, rgba(255,255,255,0.28) 0%, transparent 65%)", pointerEvents: "none", zIndex: 0 }} />
+          <div aria-hidden="true" style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)", width: "min(640px, 90vw)", height: "min(640px, 90vw)", borderRadius: "50%", background: "radial-gradient(circle, rgba(255,255,255,0.28) 0%, transparent 65%)", pointerEvents: "none", zIndex: 0 }} />
         )}
 
         {/* Content */}
         <div className="relative flex flex-col items-center" style={{ zIndex: 2, gap: hasPhoto ? "0.75rem" : "1rem", marginTop: hasPhoto ? undefined : "-3vh" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={hasPhoto ? "/logo-light.svg" : "/logo.svg"}
+            src="/logo.jpg"
             alt="Kai's Coffee"
             style={{
               width: hasPhoto ? "min(200px, 50vw)" : "min(260px, 62vw)",

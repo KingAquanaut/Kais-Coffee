@@ -284,7 +284,7 @@ export function AboutPageContent({ content }: { content: PageContent }) {
       {/* ── Hero banner ─────────────────────────────────────────────────── */}
       <div
         className="relative flex flex-col items-center justify-center text-center px-6"
-        style={{ minHeight: 380, borderBottom: "1.5px solid var(--kc-border)", overflow: "hidden" }}
+        style={{ minHeight: "min(380px, 70svh)", borderBottom: "1.5px solid var(--kc-border)", overflow: "hidden" }}
       >
         {heroImageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -314,7 +314,7 @@ export function AboutPageContent({ content }: { content: PageContent }) {
             style={{
               position: "absolute", top: "50%", left: "50%",
               transform: "translate(-50%, -50%)",
-              width: 480, height: 480, borderRadius: "50%",
+              width: "min(480px, 85vw)", height: "min(480px, 85vw)", borderRadius: "50%",
               background: "rgba(255,255,255,0.18)",
               border: "1.5px solid rgba(255,255,255,0.45)",
               zIndex: 0,
@@ -325,7 +325,7 @@ export function AboutPageContent({ content }: { content: PageContent }) {
         <div className="relative flex flex-col items-center gap-4" style={{ zIndex: 2 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={heroImageUrl ? "/logo-light.svg" : "/logo.svg"}
+            src="/logo.jpg"
             alt="Kai's Coffee"
             style={{
               width: "min(260px, 70vw)", height: "auto", marginBottom: "0.5rem",
@@ -334,7 +334,7 @@ export function AboutPageContent({ content }: { content: PageContent }) {
           />
           <AboutHeroBadge hasPhoto={Boolean(heroImageUrl)} />
           <h1
-            className="text-4xl md:text-6xl font-bold"
+            className="text-3xl sm:text-4xl md:text-6xl font-bold"
             style={{
               fontFamily: "var(--font-heading)", lineHeight: 1.1, maxWidth: "16ch",
               color: heroImageUrl ? "#fff" : undefined,

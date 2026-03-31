@@ -70,7 +70,7 @@ export default function AppNav() {
               style={{
                 color: active ? "var(--kc-black)" : "var(--kc-muted)",
                 fontWeight: active ? 700 : 400,
-                fontSize: "0.625rem",
+                fontSize: "0.6875rem",
                 letterSpacing: "0.05em",
                 textTransform: "uppercase",
                 textDecoration: "none",

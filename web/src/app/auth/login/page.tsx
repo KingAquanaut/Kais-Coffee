@@ -53,14 +53,14 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-svh items-center justify-center px-4" style={{ background: "transparent" }}>
-      <div className="kc-card w-full max-w-md px-8 py-10">
+      <div className="kc-card w-full max-w-md px-5 sm:px-8 py-8 sm:py-10">
 
         <Link href="/" className="text-sm block mb-6" style={{ color: "var(--kc-muted)" }}>
           ← Back
         </Link>
 
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.svg" alt="Kai's Coffee" className="mx-auto mb-6" style={{ width: 200, height: "auto" }} />
+        <img src="/logo.jpg" alt="Kai's Coffee" className="mx-auto mb-6" style={{ width: "min(200px, 60vw)", height: "auto" }} />
 
         <h1 className="text-3xl font-bold mb-1" style={{ fontFamily: "var(--font-heading)" }}>
           Welcome back

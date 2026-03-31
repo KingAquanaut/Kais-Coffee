@@ -93,7 +93,7 @@ export default function MenuClient({ categories }: { categories: MenuCategory[] 
               {s.nothingYet}
             </p>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-6 md:gap-x-6 md:gap-y-8">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-3 gap-y-5 sm:gap-x-4 sm:gap-y-6 md:gap-x-6 md:gap-y-8">
               {items.map(item => <MenuTile key={item.id} item={item} />)}
             </div>
           )}
@@ -105,7 +105,7 @@ export default function MenuClient({ categories }: { categories: MenuCategory[] 
 
       {/* ── Loyalty CTA ─────────────────────────────────────────────────────── */}
       <div
-        className="rounded-2xl p-7 text-center"
+        className="rounded-2xl p-5 sm:p-7 text-center"
         style={{ background: "rgba(255,255,255,0.85)", border: "1.5px solid var(--kc-border)" }}
       >
         <span className="kc-badge kc-badge-gold" style={{ marginBottom: "0.75rem", display: "inline-flex" }}>

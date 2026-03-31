@@ -209,7 +209,7 @@ export default function DashboardPage() {
           )}
 
           {/* ── Stats row ───────────────────────────────────────────────────── */}
-          <div className="grid grid-cols-2 gap-3 mt-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
             <div className="kc-card p-4 text-center">
               <p className="text-2xl font-bold" style={{ fontFamily: "var(--font-heading)", color: "var(--kc-gold)" }}>
                 {data?.lifetime_points ?? 0}

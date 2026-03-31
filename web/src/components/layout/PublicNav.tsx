@@ -126,7 +126,7 @@ function UserMenu({
           role="menu"
           style={{
             position: "absolute", top: "calc(100% + 8px)", right: 0,
-            minWidth: "210px",
+            minWidth: "min(210px, 85vw)",
             background: "var(--kc-cream)",
             border: "1.5px solid var(--kc-border)",
             borderRadius: "0.875rem",
