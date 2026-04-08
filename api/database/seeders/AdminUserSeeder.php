@@ -23,8 +23,7 @@ class AdminUserSeeder extends Seeder
         $password = env('DEFAULT_ADMIN_PASSWORD', 'password');
 
         $attributes = [
-            'name'     => 'Admin',
-            'is_admin' => true,
+            'name' => 'Admin',
         ];
 
         // Only set/overwrite the password when creating a new account
@@ -39,6 +38,12 @@ class AdminUserSeeder extends Seeder
             ['email' => 'admin@kaiscoffee.com'],
             $attributes,
         );
+
+        // Set is_admin directly — it is intentionally not mass-assignable
+        if (! $user->is_admin) {
+            $user->is_admin = true;
+            $user->save();
+        }
 
         // Ensure the admin has a reward account (required by dashboard).
         $user->rewardAccount()->firstOrCreate([], [

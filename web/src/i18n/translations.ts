@@ -88,6 +88,19 @@ const translations = {
       youAreOffline:    "You're offline",
       offlineMessage:   "Please check your internet connection and try again. Your reward points are safe.",
     },
+    reward: {
+      congratulations:  "Congratulations!",
+      earnedFree:       "You've earned a free coffee! Redeem it on your next visit.",
+      awesome:          "Awesome!",
+    },
+    langPicker: {
+      chooseLanguage:   "Choose your language",
+      chooseSubtext:    "Elige tu idioma",
+    },
+    gearGuide: {
+      title:            "Change language anytime",
+      body:             "Tap the gear icon to switch languages later.",
+    },
   },
 
   es: {
@@ -157,6 +170,19 @@ const translations = {
       tryAgain:         "Intentar de Nuevo",
       youAreOffline:    "Estás sin conexión",
       offlineMessage:   "Comprueba tu conexión a Internet e inténtalo de nuevo. Tus puntos de recompensa están seguros.",
+    },
+    reward: {
+      congratulations:  "¡Felicidades!",
+      earnedFree:       "¡Has ganado un café gratis! Canjéalo en tu próxima visita.",
+      awesome:          "¡Genial!",
+    },
+    langPicker: {
+      chooseLanguage:   "Elige tu idioma",
+      chooseSubtext:    "Choose your language",
+    },
+    gearGuide: {
+      title:            "Cambia el idioma en cualquier momento",
+      body:             "Toca el icono de engranaje para cambiar el idioma más tarde.",
     },
   },
 } as const;

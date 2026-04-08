@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useCallback, useRef } from "react";
+import Link from "next/link";
 import AdminLayout from "@/components/layout/AdminLayout";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import { admin as adminApi, type User, type RewardAccount } from "@/lib/api";
@@ -66,10 +67,17 @@ export default function AdminCustomersPage() {
             <p className="px-4 py-10 text-center text-sm" style={{ color: "var(--kc-muted)" }}>No customers found.</p>
           ) : (
             users.map((u, i) => (
-              <div
+              <Link
                 key={u.id}
+                href={`/admin/customers/${u.id}`}
                 className="grid grid-cols-4 items-center px-4 py-3 text-sm"
-                style={{ borderBottom: i < users.length - 1 ? "1px solid var(--kc-cream-dark)" : undefined }}
+                style={{
+                  borderBottom: i < users.length - 1 ? "1px solid var(--kc-cream-dark)" : undefined,
+                  textDecoration: "none", color: "inherit", cursor: "pointer",
+                  transition: "background 0.1s",
+                }}
+                onMouseEnter={e => (e.currentTarget.style.background = "var(--kc-bg)")}
+                onMouseLeave={e => (e.currentTarget.style.background = "")}
               >
                 <div className="flex items-center gap-2">
                   <div className="kc-img-placeholder" style={{ width: 32, height: 32, fontSize: "0.75rem", flexShrink: 0 }}>
@@ -80,7 +88,7 @@ export default function AdminCustomersPage() {
                 <span style={{ color: "var(--kc-muted)" }} className="truncate">{u.email}</span>
                 <span style={{ color: "var(--kc-gold)", fontWeight: 700 }}>{u.reward_account?.points_balance ?? 0}</span>
                 <span style={{ color: "var(--kc-muted)" }}>{u.reward_account?.lifetime_points ?? 0}</span>
-              </div>
+              </Link>
             ))
           )}
 

@@ -69,7 +69,9 @@ Route::prefix('v1')->group(function () {
 
             Route::get('/dashboard', [DashboardController::class, 'index']);
 
-            Route::apiResource('/users', UserController::class)->only(['index', 'show']);
+            Route::apiResource('/users', UserController::class)->only(['index', 'show', 'update']);
+            Route::post('/users/{user}/adjust-stamps',  [UserController::class, 'adjustStamps']);
+            Route::post('/users/{user}/redeem-reward',   [UserController::class, 'redeemReward']);
 
             Route::prefix('menu')->group(function () {
                 Route::apiResource('/categories', MenuCategoryController::class);

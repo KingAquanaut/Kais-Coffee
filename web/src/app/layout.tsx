@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Playfair_Display, Lato, Dancing_Script } from "next/font/google";
 import { Providers } from "./providers";
 import InstallPrompt from "@/components/ui/InstallPrompt";
+import LangPickerModal from "@/components/ui/LangPickerModal";
+import GearGuidance from "@/components/ui/GearGuidance";
 import "./globals.css";
 
 const playfair = Playfair_Display({
@@ -57,7 +59,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             backgroundPosition: "center top",
           }}
         />
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+          <LangPickerModal />
+          <GearGuidance />
+        </Providers>
         <InstallPrompt />
       </body>
     </html>

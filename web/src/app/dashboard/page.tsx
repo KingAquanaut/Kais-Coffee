@@ -4,6 +4,7 @@ import Link from "next/link";
 import AppLayout from "@/components/layout/AppLayout";
 import PointsCard from "@/components/ui/PointsCard";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
+import RewardCelebration from "@/components/ui/RewardCelebration";
 import { account as accountApi, type DashboardData, type RewardTx, type Paginated } from "@/lib/api";
 import { getToken } from "@/contexts/AuthContext";
 
@@ -170,6 +171,15 @@ export default function DashboardPage() {
 
   return (
     <AppLayout>
+      {/* Celebration animation — triggers once when stamp card fills */}
+      {data && (
+        <RewardCelebration
+          points={data.points_balance}
+          threshold={data.points_threshold}
+          lifetimePoints={data.lifetime_points}
+        />
+      )}
+
       {loading ? <LoadingSpinner text="Loading your rewards…" /> : (
         <div className="max-w-2xl">
 

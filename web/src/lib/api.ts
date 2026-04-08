@@ -5,8 +5,8 @@ const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 export type User = {
-  id: number; name: string; email: string; phone: string | null; is_admin: boolean;
-  reward_account?: RewardAccount;
+  id: number; name: string; email: string; phone: string | null; language_preference: string | null;
+  is_admin: boolean; reward_account?: RewardAccount;
 };
 export type RewardAccount = { id: number; user_id: number; points_balance: number; lifetime_points: number; };
 export type MenuCategory = {
@@ -34,6 +34,8 @@ export type AdminStats = {
   top_items: { name: string; qty_sold: number }[];
 };
 export type Paginated<T> = { data: T[]; current_page: number; last_page: number; per_page: number; total: number; };
+export type RewardSummary = { points_balance: number; lifetime_points: number; threshold: number; can_redeem: boolean; };
+export type UserDetail = { user: User & { purchases?: Purchase[] }; reward_summary: RewardSummary; };
 export type RewardTx = { id: number; type: string; points: number; description: string; created_at: string; };
 export type PageContent = Record<string, string | null>;
 
@@ -107,6 +109,14 @@ export const admin = {
   users: {
     list: (token: string, search = "", page = 1) =>
       req<Paginated<User & { reward_account?: RewardAccount }>>(`/admin/users?search=${encodeURIComponent(search)}&page=${page}`, { token }),
+    get: (token: string, id: number) =>
+      req<UserDetail>(`/admin/users/${id}`, { token }),
+    update: (token: string, id: number, body: { name?: string; email?: string; phone?: string | null; language_preference?: string | null }) =>
+      req<User>(`/admin/users/${id}`, { method: "PUT", body, token }),
+    adjustStamps: (token: string, id: number, body: { amount: number; reason: string }) =>
+      req<{ message: string; points_balance: number; lifetime_points: number; can_redeem: boolean }>(`/admin/users/${id}/adjust-stamps`, { method: "POST", body, token }),
+    redeemReward: (token: string, id: number) =>
+      req<{ message: string; points_balance: number; lifetime_points: number; can_redeem: boolean }>(`/admin/users/${id}/redeem-reward`, { method: "POST", token }),
   },
   menu: {
     categories: (token: string) => req<MenuCategory[]>("/admin/menu/categories", { token }),
