@@ -7,6 +7,7 @@ import LoadingSpinner from "../ui/LoadingSpinner";
 
 const navItems = [
   { href: "/admin",                    label: "Dashboard" },
+  { href: "/admin/scan",               label: "Scan QR" },
   { href: "/admin/purchases/record",   label: "Record Purchase" },
   { href: "/admin/purchases",          label: "Purchase History" },
   { href: "/admin/menu",               label: "Menu Management" },

@@ -36,6 +36,8 @@ export type AdminStats = {
 export type Paginated<T> = { data: T[]; current_page: number; last_page: number; per_page: number; total: number; };
 export type RewardSummary = { points_balance: number; lifetime_points: number; threshold: number; can_redeem: boolean; };
 export type UserDetail = { user: User & { purchases?: Purchase[] }; reward_summary: RewardSummary; };
+export type QrTokenResponse = { token: string; expires_at: string; ttl: number; };
+export type ScanRedeemResponse = { message: string; customer: { id: number; name: string }; points_balance: number; lifetime_points: number; can_redeem: boolean; };
 export type RewardTx = { id: number; type: string; points: number; description: string; created_at: string; };
 export type PageContent = Record<string, string | null>;
 
@@ -101,6 +103,8 @@ export const account = {
     req<Paginated<RewardTx>>(`/account/rewards/history?page=${page}`, { token }),
   redeem: (token: string) =>
     req<{ message: string; points_balance: number }>("/account/rewards/redeem", { method: "POST", token }),
+  generateQrToken: (token: string) =>
+    req<QrTokenResponse>("/account/rewards/qr-token", { method: "POST", token }),
 };
 
 // ── Admin ──────────────────────────────────────────────────────────────────
@@ -117,6 +121,8 @@ export const admin = {
       req<{ message: string; points_balance: number; lifetime_points: number; can_redeem: boolean }>(`/admin/users/${id}/adjust-stamps`, { method: "POST", body, token }),
     redeemReward: (token: string, id: number) =>
       req<{ message: string; points_balance: number; lifetime_points: number; can_redeem: boolean }>(`/admin/users/${id}/redeem-reward`, { method: "POST", token }),
+    scanRedeem: (token: string, qrToken: string) =>
+      req<ScanRedeemResponse>("/admin/scan-redeem", { method: "POST", body: { token: qrToken }, token }),
   },
   menu: {
     categories: (token: string) => req<MenuCategory[]>("/admin/menu/categories", { token }),

@@ -61,7 +61,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/purchases',       [AccountController::class, 'purchases']);
             Route::get('/rewards/balance', [AccountController::class, 'rewardsBalance']);
             Route::get('/rewards/history', [AccountController::class, 'rewardsHistory']);
-            Route::post('/rewards/redeem', [AccountController::class, 'redeem']);
+            Route::post('/rewards/qr-token', [AccountController::class, 'generateQrToken']);
         });
 
         // ── Admin ──────────────────────────────────────────────────────────
@@ -72,6 +72,7 @@ Route::prefix('v1')->group(function () {
             Route::apiResource('/users', UserController::class)->only(['index', 'show', 'update']);
             Route::post('/users/{user}/adjust-stamps',  [UserController::class, 'adjustStamps']);
             Route::post('/users/{user}/redeem-reward',   [UserController::class, 'redeemReward']);
+            Route::post('/scan-redeem',                   [UserController::class, 'scanRedeem']);
 
             Route::prefix('menu')->group(function () {
                 Route::apiResource('/categories', MenuCategoryController::class);

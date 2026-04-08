@@ -5,6 +5,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import PointsCard from "@/components/ui/PointsCard";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import RewardCelebration from "@/components/ui/RewardCelebration";
+import QrRedeemCard from "@/components/ui/QrRedeemCard";
 import { account as accountApi, type DashboardData, type RewardTx, type Paginated } from "@/lib/api";
 import { getToken } from "@/contexts/AuthContext";
 
@@ -52,10 +53,9 @@ function TxRow({ tx }: { tx: RewardTx }) {
 // ── Available reward card ─────────────────────────────────────────────────────
 
 function RewardCard({
-  threshold, points, canRedeem, onRedeem, redeeming,
+  threshold, points, canRedeem,
 }: {
   threshold: number; points: number; canRedeem: boolean;
-  onRedeem: () => void; redeeming: boolean;
 }) {
   const progress = Math.min(100, Math.round((points / threshold) * 100));
   const remaining = Math.max(0, threshold - (points % threshold));
@@ -112,13 +112,9 @@ function RewardCard({
         </div>
 
         {canRedeem && (
-          <button
-            onClick={onRedeem}
-            disabled={redeeming}
-            className="kc-btn kc-btn-gold kc-btn-sm mt-3"
-          >
-            {redeeming ? "Redeeming…" : "Redeem now"}
-          </button>
+          <p className="text-xs mt-3 font-semibold" style={{ color: "var(--kc-gold)" }}>
+            Use QR code below to redeem
+          </p>
         )}
       </div>
     </div>
@@ -131,7 +127,6 @@ export default function DashboardPage() {
   const [data,     setData]     = useState<DashboardData | null>(null);
   const [history,  setHistory]  = useState<Paginated<RewardTx> | null>(null);
   const [loading,  setLoading]  = useState(true);
-  const [redeeming, setRedeeming] = useState(false);
   const [msg,      setMsg]      = useState<{ text: string; ok: boolean } | null>(null);
 
   const load = useCallback(async () => {
@@ -153,21 +148,6 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => { load(); }, [load]);
-
-  const handleRedeem = async () => {
-    const token = getToken();
-    if (!token) return;
-    setRedeeming(true);
-    try {
-      const res = await accountApi.redeem(token);
-      setMsg({ text: res.message, ok: true });
-      load();
-    } catch {
-      setMsg({ text: "Could not redeem. Please try again.", ok: false });
-    } finally {
-      setRedeeming(false);
-    }
-  };
 
   return (
     <AppLayout>
@@ -213,8 +193,6 @@ export default function DashboardPage() {
               points={data.points_balance}
               threshold={data.points_threshold}
               canRedeem={data.can_redeem}
-              onRedeem={handleRedeem}
-              redeeming={redeeming}
             />
           )}
 
@@ -244,11 +222,16 @@ export default function DashboardPage() {
                 threshold={data.points_threshold}
                 points={data.points_balance}
                 canRedeem={data.can_redeem}
-                onRedeem={handleRedeem}
-                redeeming={redeeming}
               />
             )}
           </section>
+
+          {/* ── QR Redemption ─────────────────────────────────────────────── */}
+          {data && (
+            <div className="mt-5">
+              <QrRedeemCard canRedeem={data.can_redeem} />
+            </div>
+          )}
 
           {/* ── Reward history ──────────────────────────────────────────────── */}
           <section className="mt-8">

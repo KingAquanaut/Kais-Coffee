@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\RedemptionToken;
 use App\Models\RewardAccount;
 use App\Models\RewardTransaction;
 use App\Models\Setting;
@@ -162,6 +163,80 @@ class UserController extends Controller
 
         return response()->json([
             'message'         => 'Free coffee redeemed successfully!',
+            'points_balance'  => $result->points_balance,
+            'lifetime_points' => $result->lifetime_points,
+            'can_redeem'      => $result->canRedeem($threshold),
+        ]);
+    }
+
+    /**
+     * Verify a scanned QR token and atomically redeem the reward.
+     */
+    public function scanRedeem(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'token' => ['required', 'string', 'size:64'],
+        ]);
+
+        $redemption = RedemptionToken::findByRaw($data['token']);
+
+        if (! $redemption) {
+            return response()->json(['message' => 'Invalid redemption code.'], 404);
+        }
+
+        if ($redemption->isUsed()) {
+            return response()->json(['message' => 'This code has already been used.'], 409);
+        }
+
+        if ($redemption->isExpired()) {
+            return response()->json(['message' => 'This code has expired. Ask the customer to generate a new one.'], 410);
+        }
+
+        $threshold = (int) Setting::get('points_for_reward', 8);
+        $user      = $redemption->user;
+        $account   = $user->rewardAccount;
+
+        if (! $account || ! $account->canRedeem($threshold)) {
+            return response()->json([
+                'message' => "Customer does not have enough stamps. Need {$threshold}, have " . ($account?->points_balance ?? 0) . ".",
+            ], 422);
+        }
+
+        // Atomic: lock account, redeem, mark token used
+        $result = DB::transaction(function () use ($account, $threshold, $request, $redemption) {
+            $locked = RewardAccount::lockForUpdate()->find($account->id);
+
+            if (! $locked || $locked->points_balance < $threshold) {
+                return null;
+            }
+
+            // Mark token used (inside transaction for atomicity)
+            $redemption->update(['used_at' => now()]);
+
+            $locked->decrement('points_balance', $threshold);
+
+            RewardTransaction::create([
+                'reward_account_id' => $locked->id,
+                'type'              => 'redeem',
+                'points'            => -$threshold,
+                'description'       => "QR redemption by {$request->user()->name}",
+            ]);
+
+            return $locked->fresh();
+        });
+
+        if (! $result) {
+            return response()->json([
+                'message' => 'Reward already redeemed or insufficient stamps.',
+            ], 409);
+        }
+
+        return response()->json([
+            'message'         => 'Free coffee redeemed successfully!',
+            'customer'        => [
+                'id'   => $user->id,
+                'name' => $user->name,
+            ],
             'points_balance'  => $result->points_balance,
             'lifetime_points' => $result->lifetime_points,
             'can_redeem'      => $result->canRedeem($threshold),

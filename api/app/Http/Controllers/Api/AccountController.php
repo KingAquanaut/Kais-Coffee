@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\RedemptionToken;
 use App\Models\RewardAccount;
 use App\Models\RewardTransaction;
 use App\Models\Setting;
@@ -98,6 +99,30 @@ class AccountController extends Controller
         return response()->json([
             'message'        => 'Redeemed! Enjoy your free coffee.',
             'points_balance' => $account->fresh()->points_balance,
+        ]);
+    }
+
+    /**
+     * Generate a short-lived QR redemption token.
+     * Only allowed when customer has a redeemable reward.
+     */
+    public function generateQrToken(Request $request): JsonResponse
+    {
+        $threshold = (int) Setting::get('points_for_reward', 8);
+        $account   = $request->user()->rewardAccount;
+
+        if (! $account || ! $account->canRedeem($threshold)) {
+            return response()->json([
+                'message' => "You need {$threshold} stamps to generate a redemption code.",
+            ], 422);
+        }
+
+        $result = RedemptionToken::issue($request->user()->id, 60);
+
+        return response()->json([
+            'token'      => $result['token'],
+            'expires_at' => $result['expires_at'],
+            'ttl'        => $result['ttl'],
         ]);
     }
 }

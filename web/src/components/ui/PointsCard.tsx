@@ -2,8 +2,6 @@ type Props = {
   points: number;
   threshold: number;
   canRedeem: boolean;
-  onRedeem?: () => void;
-  redeeming?: boolean;
 };
 
 /** Filled stamp circle */
@@ -53,7 +51,7 @@ function StampEmpty({ isFree }: { isFree?: boolean }) {
   );
 }
 
-export default function PointsCard({ points, threshold, canRedeem, onRedeem, redeeming }: Props) {
+export default function PointsCard({ points, threshold, canRedeem }: Props) {
   // Stamps collected in the current card cycle
   const stampsInCycle = canRedeem ? threshold : (points % threshold);
   const toFree = Math.max(0, threshold - stampsInCycle);
@@ -96,14 +94,10 @@ export default function PointsCard({ points, threshold, canRedeem, onRedeem, red
         }
       </p>
 
-      {canRedeem && onRedeem && (
-        <button
-          onClick={onRedeem}
-          disabled={redeeming}
-          className="kc-btn kc-btn-gold w-full mt-4"
-        >
-          {redeeming ? "Redeeming…" : "Redeem Free Coffee"}
-        </button>
+      {canRedeem && (
+        <p className="text-xs mt-4 text-center font-semibold" style={{ color: "var(--kc-gold)" }}>
+          Show your QR code to the barista to redeem
+        </p>
       )}
     </div>
   );
