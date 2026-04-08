@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useLang } from "@/contexts/LangContext";
 import { LANGUAGES, type LangCode } from "@/i18n/translations";
 
@@ -15,14 +15,10 @@ const PICKED_KEY = "kc-lang-picked";
 
 export default function LangPickerModal() {
   const { setLang } = useLang();
-  const [show, setShow] = useState(false);
-
-  useEffect(() => {
-    const alreadyPicked = localStorage.getItem(PICKED_KEY);
-    if (!alreadyPicked) {
-      setShow(true);
-    }
-  }, []);
+  const [show, setShow] = useState(() => {
+    if (globalThis.window === undefined) return false;
+    return !localStorage.getItem(PICKED_KEY);
+  });
 
   const handleSelect = (code: LangCode) => {
     setLang(code);
