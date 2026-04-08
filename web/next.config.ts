@@ -118,6 +118,7 @@ function buildRemotePatterns() {
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  turbopack: {},
   images: {
     remotePatterns: buildRemotePatterns(),
   },

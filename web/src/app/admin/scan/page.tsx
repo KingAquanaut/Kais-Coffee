@@ -18,21 +18,31 @@ export default function AdminScanPage() {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const scannerRef = useRef<HTMLDivElement>(null);
   const html5QrRef = useRef<unknown>(null);
+  const mountedRef = useRef(true);
 
   // Clean up camera on unmount
   useEffect(() => {
-    return () => { stopCamera(); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      // Inline cleanup — don't call state setters after unmount
+      const scanner = html5QrRef.current as { stop?: () => Promise<void>; clear?: () => void } | null;
+      if (scanner) {
+        try { scanner.stop?.().catch(() => {}); } catch {}
+        try { scanner.clear?.(); } catch {}
+        html5QrRef.current = null;
+      }
+    };
   }, []);
 
   const stopCamera = useCallback(() => {
     const scanner = html5QrRef.current as { stop?: () => Promise<void>; clear?: () => void } | null;
     if (scanner) {
-      scanner.stop?.().catch(() => {});
-      scanner.clear?.();
+      try { scanner.stop?.().catch(() => {}); } catch {}
+      try { scanner.clear?.(); } catch {}
       html5QrRef.current = null;
     }
-    setCameraActive(false);
+    if (mountedRef.current) setCameraActive(false);
   }, []);
 
   const handleRedeem = useCallback(async (scannedToken: string) => {
@@ -66,8 +76,8 @@ export default function AdminScanPage() {
       const { Html5Qrcode } = await import("html5-qrcode");
       const scannerId = "kc-qr-scanner";
 
-      // Ensure the DOM element exists
-      if (!scannerRef.current) return;
+      // Ensure the DOM element exists and component is still mounted
+      if (!scannerRef.current || !mountedRef.current) return;
       scannerRef.current.id = scannerId;
 
       const scanner = new Html5Qrcode(scannerId);
@@ -75,14 +85,20 @@ export default function AdminScanPage() {
 
       await scanner.start(
         { facingMode: "environment" },
-        { fps: 10, qrbox: { width: 250, height: 250 } },
+        {
+          fps: 10,
+          qrbox: { width: 220, height: 220 },
+          aspectRatio: 1,
+        },
         (decodedText) => {
           // On successful scan, stop camera and redeem
           scanner.stop().then(() => {
-            scanner.clear();
+            try { scanner.clear(); } catch {}
             html5QrRef.current = null;
-            setCameraActive(false);
-            handleRedeem(decodedText);
+            if (mountedRef.current) {
+              setCameraActive(false);
+              handleRedeem(decodedText);
+            }
           }).catch(() => {});
         },
         () => {
@@ -90,11 +106,13 @@ export default function AdminScanPage() {
         },
       );
 
-      setCameraActive(true);
+      if (mountedRef.current) setCameraActive(true);
     } catch {
-      setCameraError("Could not access camera. Please allow camera permissions or use manual entry.");
-      setStatus({ kind: "idle" });
-      setCameraActive(false);
+      if (mountedRef.current) {
+        setCameraError("Could not access camera. Please allow camera permissions or use manual entry.");
+        setStatus({ kind: "idle" });
+        setCameraActive(false);
+      }
     }
   }, [handleRedeem]);
 
