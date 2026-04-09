@@ -32,11 +32,12 @@
 *, *::before, *::after { box-sizing: border-box; }
 
 html {
-  /* Primary background: position:fixed div in layout.tsx (avoids
-     scroll-triggered repaints from background-attachment:fixed).
-     Fallback: same watercolor painted on the root canvas so iOS
-     rubber-band overscroll shows the texture instead of flat white. */
-  background: #f5f9fc url("/watercolor-bg.svg") center top / cover no-repeat;
+  /* Primary background: position:fixed div in layout.tsx (GPU-composited,
+     never repaints on scroll).  The html canvas only needs a solid colour
+     that matches the SVG's base tone — it's visible solely during iOS
+     rubber-band overscroll, where a lightweight solid avoids the
+     rasterisation cost of painting the full SVG a second time. */
+  background: #f5f9fc;
   color:            var(--kc-black);
   font-family:      var(--font-body);
   -webkit-font-smoothing: antialiased;
