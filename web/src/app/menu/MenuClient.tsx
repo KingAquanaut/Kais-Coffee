@@ -3,6 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import ItemImage from "@/components/ui/ItemImage";
 import { useLang } from "@/contexts/LangContext";
+import { useAuth } from "@/contexts/AuthContext";
 import type { MenuCategory, MenuItem } from "@/lib/api";
 
 // ── Single item tile ───────────────────────────────────────────────────────────
@@ -29,6 +30,8 @@ function MenuTile({ item }: { item: MenuItem }) {
 // ── Interactive menu + loyalty CTA ────────────────────────────────────────────
 export default function MenuClient({ categories }: { categories: MenuCategory[] }) {
   const { strings } = useLang();
+  const { user } = useAuth();
+  const loggedIn = Boolean(user);
   const s = strings.menu;
 
   const [activeId, setActiveId] = useState<number | null>(
@@ -117,8 +120,8 @@ export default function MenuClient({ categories }: { categories: MenuCategory[] 
         <p className="text-sm mt-1.5 mb-5" style={{ color: "var(--kc-muted)" }}>
           {s.stampSubtext}
         </p>
-        <Link href="/auth/register" className="kc-btn">
-          {s.createAccount}
+        <Link href={loggedIn ? "/dashboard" : "/auth/register"} className="kc-btn">
+          {loggedIn ? strings.home.viewMyStamps : s.createAccount}
         </Link>
       </div>
     </>
