@@ -235,8 +235,11 @@ export default function PublicNav({ overlayHero = false }: PublicNavProps) {
           style={{
             height: 40,
             width: "auto",
-            transition: "opacity 0.35s ease, filter 0.35s ease",
-            filter: ghost ? "brightness(0) invert(1) drop-shadow(0 1px 6px rgba(0,0,0,0.3))" : undefined,
+            transition: "opacity 0.35s ease",
+            background: ghost ? "rgba(255,255,255,0.75)" : undefined,
+            borderRadius: ghost ? "0.5rem" : undefined,
+            padding: ghost ? "0.2rem 0.5rem" : undefined,
+            boxShadow: ghost ? "0 1px 8px rgba(0,0,0,0.15)" : undefined,
           }}
         />
       </Link>
