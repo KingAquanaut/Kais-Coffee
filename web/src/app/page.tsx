@@ -1,7 +1,7 @@
 import PublicNav from "@/components/layout/PublicNav";
-import { HeroBadge, HeroButtons, HeroText, StampSection, PillarsSection, HomeFooter } from "./HomeContent";
+import { HeroBadge, HeroButtons, HeroText, SeasonalSection, StampSection, PillarsSection, HomeFooter } from "./HomeContent";
 import { optimized } from "@/lib/cloudinary";
-import type { PageContent } from "@/lib/api";
+import type { PageContent, MenuItem } from "@/lib/api";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 
@@ -13,17 +13,19 @@ export default async function HomePage() {
   let heroImageUrl:  string | null = null;
   let cmsHeading:    string | null = null;
   let cmsSubtext:    string | null = null;
+  let seasonalItems: MenuItem[] = [];
   try {
-    const res = await fetch(`${BASE}/page-contents/home`, {
-      next: { revalidate: 300 },
-      headers: { Accept: "application/json" },
-    });
-    if (res.ok) {
-      const data: PageContent = await res.json();
+    const [cmsRes, seasonalRes] = await Promise.all([
+      fetch(`${BASE}/page-contents/home`, { next: { revalidate: 300 }, headers: { Accept: "application/json" } }),
+      fetch(`${BASE}/menu/seasonal`,       { next: { revalidate: 300 }, headers: { Accept: "application/json" } }),
+    ]);
+    if (cmsRes.ok) {
+      const data: PageContent = await cmsRes.json();
       heroImageUrl = (data.hero_image_url as string | null) || null;
       cmsHeading   = (data.hero_heading   as string | null) || null;
       cmsSubtext   = (data.hero_subtext   as string | null) || null;
     }
+    if (seasonalRes.ok) seasonalItems = await seasonalRes.json();
   } catch { /* render with nulls → client uses translation fallbacks */ }
 
   const hasPhoto = Boolean(heroImageUrl);
@@ -88,6 +90,9 @@ export default async function HomePage() {
           </svg>
         </div>
       </div>
+
+      {/* ── Seasonal drinks promotion (hidden when none are toggled) ── */}
+      {seasonalItems.length > 0 && <SeasonalSection items={seasonalItems} />}
 
       {/* ── Stamp card + pillars + footer — all translated client components ── */}
       <StampSection />

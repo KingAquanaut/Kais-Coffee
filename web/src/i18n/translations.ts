@@ -54,6 +54,10 @@ const translations = {
       coldBrewBody:     "18-hour cold steep. Nitrogen on tap. Smooth, never bitter.",
       pastries:         "House Pastries",
       pastriesBody:     "Almond croissants, banana bread, seasonal scones. Baked fresh daily.",
+      seasonalBadge:    "Limited Time",
+      seasonalTitle:    "Seasonal Favorites",
+      seasonalSubtext:  "Try our handpicked specials — available for a limited time only.",
+      seasonalCta:      "View Full Menu",
       footer:           "Made with care",
     },
     menu: {
@@ -138,6 +142,10 @@ const translations = {
       coldBrewBody:     "Infusión en frío de 18 horas. Nitrógeno en grifo. Suave, nunca amargo.",
       pastries:         "Repostería de Casa",
       pastriesBody:     "Croissants de almendra, pan de plátano y scones de temporada. Horneados frescos diariamente.",
+      seasonalBadge:    "Por Tiempo Limitado",
+      seasonalTitle:    "Favoritos de Temporada",
+      seasonalSubtext:  "Prueba nuestras especialidades seleccionadas — disponibles por tiempo limitado.",
+      seasonalCta:      "Ver Menú Completo",
       footer:           "Hecho con cuidado",
     },
     menu: {

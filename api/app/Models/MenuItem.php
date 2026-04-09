@@ -21,6 +21,7 @@ class MenuItem extends Model
         'image_url',
         'is_active',
         'is_featured',
+        'is_seasonal',
         'sort_order',
     ];
 
@@ -30,6 +31,7 @@ class MenuItem extends Model
             'price' => 'decimal:2',
             'is_active' => 'boolean',
             'is_featured' => 'boolean',
+            'is_seasonal' => 'boolean',
         ];
     }
 

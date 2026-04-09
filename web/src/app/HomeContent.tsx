@@ -4,6 +4,8 @@
 import Link from "next/link";
 import { useLang } from "@/contexts/LangContext";
 import { useAuth } from "@/contexts/AuthContext";
+import ItemImage from "@/components/ui/ItemImage";
+import type { MenuItem } from "@/lib/api";
 
 // ── Stamp card preview (matches dashboard PointsCard look) ───────────────────
 function StampCardPreview({ exampleLabel }: { exampleLabel: string }) {
@@ -151,6 +153,110 @@ export function HeroBadge({ hasPhoto }: { hasPhoto: boolean }) {
     >
       {strings.home.badge}
     </p>
+  );
+}
+
+// ── Seasonal drinks promotion ─────────────────────────────────────────────────
+export function SeasonalSection({ items }: { items: MenuItem[] }) {
+  const { lang, strings } = useLang();
+  const s = strings.home;
+
+  return (
+    <section className="px-6 pt-16 pb-8">
+      <div className="max-w-2xl mx-auto">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <span
+            className="kc-badge"
+            style={{
+              background: "linear-gradient(135deg, #f0dcaa 0%, #d4a84b 100%)",
+              color: "#fff",
+              fontSize: "0.6875rem",
+              padding: "0.2rem 0.85rem",
+              display: "inline-flex",
+              marginBottom: "1rem",
+              boxShadow: "0 2px 8px rgba(184,150,46,0.25)",
+            }}
+          >
+            ✦ {s.seasonalBadge}
+          </span>
+          <h2
+            className="text-2xl sm:text-3xl font-bold"
+            style={{ fontFamily: "var(--font-heading)", lineHeight: 1.1 }}
+          >
+            {s.seasonalTitle}
+          </h2>
+          <p className="text-sm mt-2" style={{ color: "var(--kc-muted)", lineHeight: 1.8 }}>
+            {s.seasonalSubtext}
+          </p>
+        </div>
+
+        {/* Drink cards */}
+        <div
+          className={`grid gap-5 ${items.length === 1 ? "max-w-xs mx-auto" : "grid-cols-1 sm:grid-cols-2"}`}
+        >
+          {items.map(item => {
+            const name = (lang === "es" && item.name_es) ? item.name_es : item.name;
+            const price = `$${parseFloat(item.price).toFixed(2)}`;
+            return (
+              <div
+                key={item.id}
+                className="kc-card kc-lift"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "1rem",
+                  padding: "1rem 1.25rem",
+                  background: "linear-gradient(135deg, var(--kc-cream) 0%, #fff 100%)",
+                  border: "1.5px solid var(--kc-gold-lt)",
+                }}
+              >
+                <div style={{ flexShrink: 0 }}>
+                  <ItemImage name={name} imageUrl={item.image_url} size={80} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p
+                    className="font-bold leading-snug"
+                    style={{
+                      fontFamily: "var(--font-script)",
+                      fontSize: "1.1rem",
+                      color: "var(--kc-blue-deep)",
+                    }}
+                  >
+                    {name}
+                  </p>
+                  {item.description && (
+                    <p
+                      className="text-xs mt-1"
+                      style={{
+                        color: "var(--kc-muted)",
+                        lineHeight: 1.5,
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {item.description}
+                    </p>
+                  )}
+                  <p className="font-bold mt-1.5" style={{ fontSize: "0.9rem", color: "var(--kc-gold)" }}>
+                    {price}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* CTA */}
+        <div className="text-center mt-6">
+          <Link href="/menu" className="kc-btn kc-btn-outline kc-btn-sm">
+            {s.seasonalCta}
+          </Link>
+        </div>
+      </div>
+    </section>
   );
 }
 

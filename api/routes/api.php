@@ -44,6 +44,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/items',        [MenuController::class, 'items']);
         Route::get('/items/{item}', [MenuController::class, 'show']);
         Route::get('/featured',     [MenuController::class, 'featured']);
+        Route::get('/seasonal',     [MenuController::class, 'seasonal']);
     });
 
     // ── Public Page Content ────────────────────────────────────────────────

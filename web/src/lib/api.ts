@@ -15,7 +15,7 @@ export type MenuCategory = {
 };
 export type MenuItem = {
   id: number; menu_category_id: number; name: string; name_es: string | null; slug: string; description: string | null;
-  price: string; image_url: string | null; is_active: boolean; is_featured: boolean; sort_order: number;
+  price: string; image_url: string | null; is_active: boolean; is_featured: boolean; is_seasonal: boolean; sort_order: number;
   category?: { id: number; name: string; slug: string };
 };
 export type PurchaseItem = { id: number; menu_item_id: number | null; name: string; unit_price: string; quantity: number; subtotal: string; };
@@ -92,6 +92,7 @@ export const menu = {
   categories: () => req<MenuCategory[]>("/menu/categories"),
   items: ()    => req<MenuItem[]>("/menu/items"),
   featured: () => req<MenuItem[]>("/menu/featured"),
+  seasonal: () => req<MenuItem[]>("/menu/seasonal"),
 };
 
 // ── Account ────────────────────────────────────────────────────────────────

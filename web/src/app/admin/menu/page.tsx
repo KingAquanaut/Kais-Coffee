@@ -12,11 +12,12 @@ type ItemForm = {
   description: string;
   price: string;
   is_featured: boolean;
+  is_seasonal: boolean;
   is_active: boolean;
 };
 
 const emptyItemForm = (): ItemForm => ({
-  name: "", name_es: "", description: "", price: "", is_featured: false, is_active: true,
+  name: "", name_es: "", description: "", price: "", is_featured: false, is_seasonal: false, is_active: true,
 });
 
 export default function AdminMenuPage() {
@@ -85,6 +86,7 @@ export default function AdminMenuPage() {
       description: item.description ?? "",
       price: item.price,
       is_featured: item.is_featured,
+      is_seasonal: item.is_seasonal,
       is_active: item.is_active,
     });
     setImageFile(null);
@@ -119,6 +121,7 @@ export default function AdminMenuPage() {
         description: form.description,
         price: parseFloat(form.price) as unknown as never,
         is_featured: form.is_featured,
+        is_seasonal: form.is_seasonal,
         is_active: form.is_active,
       };
 
@@ -232,6 +235,7 @@ export default function AdminMenuPage() {
                   {item.is_active ? "Active" : "Hidden"}
                 </span>
                 {item.is_featured && <span className="kc-badge kc-badge-gold">Featured</span>}
+                {item.is_seasonal && <span className="kc-badge kc-badge-blue">Seasonal</span>}
                 <div className="ml-auto flex gap-2">
                   <button onClick={() => openEdit(item)} className="kc-btn kc-btn-sm kc-btn-outline">Edit</button>
                   <button onClick={() => handleDelete(item.id)} className="kc-btn kc-btn-sm kc-btn-danger">Del</button>
@@ -401,23 +405,59 @@ export default function AdminMenuPage() {
               </div>
 
               {/* ── Toggles ──────────────────────────────────────────────────── */}
-              <div className="flex gap-4">
-                <label className="flex items-center gap-2 cursor-pointer text-sm">
-                  <input
-                    type="checkbox"
-                    checked={form.is_active}
-                    onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))}
-                  />
-                  Active
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer text-sm">
-                  <input
-                    type="checkbox"
-                    checked={form.is_featured}
-                    onChange={e => setForm(f => ({ ...f, is_featured: e.target.checked }))}
-                  />
-                  Featured
-                </label>
+              <div className="flex flex-col gap-3">
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer text-sm">
+                    <input
+                      type="checkbox"
+                      checked={form.is_active}
+                      onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))}
+                    />
+                    Active
+                  </label>
+                  <label className="flex items-center gap-2 cursor-pointer text-sm">
+                    <input
+                      type="checkbox"
+                      checked={form.is_featured}
+                      onChange={e => setForm(f => ({ ...f, is_featured: e.target.checked }))}
+                    />
+                    Featured
+                  </label>
+                </div>
+
+                {/* Seasonal toggle — max 2 across all items */}
+                {(() => {
+                  const otherSeasonalCount = items.filter(
+                    i => i.is_seasonal && i.id !== modal.item?.id
+                  ).length;
+                  const atLimit = otherSeasonalCount >= 2 && !form.is_seasonal;
+                  return (
+                    <div
+                      style={{
+                        borderLeft: "3px solid var(--kc-gold)",
+                        paddingLeft: "0.75rem",
+                        opacity: atLimit ? 0.5 : 1,
+                      }}
+                    >
+                      <label className="flex items-center gap-2 cursor-pointer text-sm">
+                        <input
+                          type="checkbox"
+                          checked={form.is_seasonal}
+                          disabled={atLimit}
+                          onChange={e => setForm(f => ({ ...f, is_seasonal: e.target.checked }))}
+                        />
+                        <span style={{ fontWeight: 700, color: "var(--kc-gold)" }}>
+                          Seasonal Promo
+                        </span>
+                      </label>
+                      <p className="text-xs mt-0.5" style={{ color: "var(--kc-muted)" }}>
+                        {atLimit
+                          ? "Max 2 seasonal items — remove one before adding another."
+                          : "Promotes this drink on the home page (max 2 at a time)."}
+                      </p>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 

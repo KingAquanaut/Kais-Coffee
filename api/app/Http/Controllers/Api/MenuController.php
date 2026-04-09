@@ -46,4 +46,16 @@ class MenuController extends Controller
 
         return response()->json($items);
     }
+
+    public function seasonal(): JsonResponse
+    {
+        $items = MenuItem::where('is_active', true)
+            ->where('is_seasonal', true)
+            ->with('category:id,name,slug')
+            ->orderBy('sort_order')
+            ->limit(2)
+            ->get();
+
+        return response()->json($items);
+    }
 }

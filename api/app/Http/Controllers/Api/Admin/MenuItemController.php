@@ -33,6 +33,7 @@ class MenuItemController extends Controller
             'image_url'        => ['nullable', 'url'],
             'is_active'        => ['nullable', 'boolean'],
             'is_featured'      => ['nullable', 'boolean'],
+            'is_seasonal'      => ['nullable', 'boolean'],
             'sort_order'       => ['nullable', 'integer'],
         ]);
 
@@ -59,6 +60,7 @@ class MenuItemController extends Controller
             'image_url'        => ['nullable', 'url'],
             'is_active'        => ['nullable', 'boolean'],
             'is_featured'      => ['nullable', 'boolean'],
+            'is_seasonal'      => ['nullable', 'boolean'],
             'sort_order'       => ['nullable', 'integer'],
         ]);
 
