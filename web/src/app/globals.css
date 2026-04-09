@@ -208,6 +208,130 @@ h1, h2, h3, h4 {
   background: rgba(255, 255, 255, 0.55);
 }
 
+/* ── Flip card system ──────────────────────────────────────────────────── */
+.kc-flip-card {
+  perspective: 900px;
+  cursor: pointer;
+}
+.kc-flip-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.6s cubic-bezier(0.4, 0.0, 0.2, 1);
+  transform-style: preserve-3d;
+}
+.kc-flip-card.is-flipped .kc-flip-inner {
+  transform: rotateY(180deg);
+}
+.kc-flip-front,
+.kc-flip-back {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+.kc-flip-back {
+  transform: rotateY(180deg);
+}
+
+/* ── Smoke / steam hover effect on flip cards ──────────────────────────── */
+.kc-flip-card .kc-smoke {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  opacity: 0;
+  filter: blur(8px);
+  z-index: 3;
+  transition: opacity 0.4s ease;
+}
+.kc-flip-card:hover .kc-smoke,
+.kc-flip-card.is-flipped .kc-smoke {
+  opacity: 1;
+}
+.kc-smoke-1 {
+  width: 30px; height: 30px;
+  background: radial-gradient(circle, rgba(184,150,46,0.22) 0%, transparent 70%);
+  top: -8px; right: 12%;
+  animation: kc-smoke-drift-1 3.2s ease-in-out infinite;
+}
+.kc-smoke-2 {
+  width: 22px; height: 22px;
+  background: radial-gradient(circle, rgba(58,124,165,0.18) 0%, transparent 70%);
+  top: -4px; left: 18%;
+  animation: kc-smoke-drift-2 2.8s ease-in-out infinite 0.5s;
+}
+.kc-smoke-3 {
+  width: 26px; height: 26px;
+  background: radial-gradient(circle, rgba(184,150,46,0.16) 0%, transparent 70%);
+  top: -10px; left: 48%;
+  animation: kc-smoke-drift-3 3.6s ease-in-out infinite 1s;
+}
+
+@keyframes kc-smoke-drift-1 {
+  0%, 100% { transform: translateY(0) scale(1);   opacity: 0; }
+  15%       { opacity: 1; }
+  85%       { opacity: 1; }
+  100%      { transform: translateY(-22px) translateX(6px) scale(1.5); opacity: 0; }
+}
+@keyframes kc-smoke-drift-2 {
+  0%, 100% { transform: translateY(0) scale(1);   opacity: 0; }
+  15%       { opacity: 0.8; }
+  85%       { opacity: 0.8; }
+  100%      { transform: translateY(-18px) translateX(-5px) scale(1.3); opacity: 0; }
+}
+@keyframes kc-smoke-drift-3 {
+  0%, 100% { transform: translateY(0) scale(1);   opacity: 0; }
+  20%       { opacity: 0.7; }
+  80%       { opacity: 0.7; }
+  100%      { transform: translateY(-26px) translateX(3px) scale(1.6); opacity: 0; }
+}
+
+/* ── "Click me" indicator ──────────────────────────────────────────────── */
+.kc-click-hint {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: rgba(184, 150, 46, 0.12);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  font-size: 0.55rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--kc-gold);
+  pointer-events: none;
+  animation: kc-hint-pulse 2.4s ease-in-out infinite;
+  transition: opacity 0.3s ease;
+}
+.kc-flip-card.is-flipped .kc-click-hint {
+  opacity: 0;
+}
+/* Tiny smoke puff next to the hint */
+.kc-click-hint::before {
+  content: "";
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(184,150,46,0.35) 0%, transparent 70%);
+  filter: blur(3px);
+  animation: kc-hint-smoke 2s ease-in-out infinite;
+}
+@keyframes kc-hint-pulse {
+  0%, 100% { opacity: 0.65; transform: translateY(0); }
+  50%       { opacity: 1;    transform: translateY(-2px); }
+}
+@keyframes kc-hint-smoke {
+  0%, 100% { transform: scale(1) translateY(0);   opacity: 0.4; }
+  50%       { transform: scale(1.6) translateY(-4px); opacity: 0.8; }
+}
+
 /* Hero background — slow-breathing depth effect */
 .kc-hero-bg-motion {
   animation: kc-hero-breathe 14s ease-in-out infinite;
@@ -257,6 +381,11 @@ h1, h2, h3, h4 {
   .kc-logo-iridescent::before { animation: none; }
   /* Steam completely hidden — no movement for motion-sensitive users */
   .kc-steam-wisp     { animation: none; opacity: 0; }
+  /* Flip card — instant flip, no smoke */
+  .kc-flip-inner     { transition: none; }
+  .kc-smoke          { display: none; }
+  .kc-click-hint     { animation: none; }
+  .kc-click-hint::before { animation: none; }
 }
 
 /* ── Nav logo iridescent backdrop (ghost / hero mode) ────────────────────── */

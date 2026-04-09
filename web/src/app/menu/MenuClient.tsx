@@ -1,28 +1,96 @@
 "use client";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
 import ItemImage from "@/components/ui/ItemImage";
 import { useLang } from "@/contexts/LangContext";
 import { useAuth } from "@/contexts/AuthContext";
 import type { MenuCategory, MenuItem } from "@/lib/api";
 
-// ── Single item tile ───────────────────────────────────────────────────────────
+// ── Single item tile — flip card with smoke effect ────────────────────────────
 function MenuTile({ item }: { item: MenuItem }) {
   const { lang } = useLang();
+  const [flipped, setFlipped] = useState(false);
   const displayName = (lang === "es" && item.name_es) ? item.name_es : item.name;
   const price = `$${parseFloat(item.price).toFixed(2)}`;
+  const hasDescription = Boolean(item.description?.trim());
+
+  const toggle = useCallback(() => {
+    if (hasDescription) setFlipped(f => !f);
+  }, [hasDescription]);
+
   return (
-    <div className="kc-menu-tile flex flex-col items-center text-center gap-1.5 px-1 py-3">
-      <ItemImage name={displayName} imageUrl={item.image_url} size={120} />
-      <h3
-        className="mt-2 leading-snug px-1"
-        style={{ fontFamily: "var(--font-script)", fontSize: "1.05rem", color: "var(--kc-blue-deep)", fontWeight: 700 }}
-      >
-        {displayName}
-      </h3>
-      <p className="font-semibold" style={{ fontSize: "0.875rem", color: "var(--kc-black)" }}>
-        {price}
-      </p>
+    <div
+      className={`kc-flip-card${flipped ? " is-flipped" : ""}`}
+      onClick={toggle}
+      style={{ height: 220 }}
+    >
+      {/* Smoke wisps — visible on hover */}
+      {hasDescription && (
+        <>
+          <div className="kc-smoke kc-smoke-1" />
+          <div className="kc-smoke kc-smoke-2" />
+          <div className="kc-smoke kc-smoke-3" />
+          <div className="kc-click-hint">☕ tap</div>
+        </>
+      )}
+
+      <div className="kc-flip-inner">
+        {/* ── Front ── */}
+        <div
+          className="kc-flip-front kc-menu-tile flex flex-col items-center text-center gap-1.5 px-1 py-3"
+          style={{ background: "transparent" }}
+        >
+          <ItemImage name={displayName} imageUrl={item.image_url} size={120} />
+          <h3
+            className="mt-2 leading-snug px-1"
+            style={{ fontFamily: "var(--font-script)", fontSize: "1.05rem", color: "var(--kc-blue-deep)", fontWeight: 700 }}
+          >
+            {displayName}
+          </h3>
+          <p className="font-semibold" style={{ fontSize: "0.875rem", color: "var(--kc-black)" }}>
+            {price}
+          </p>
+        </div>
+
+        {/* ── Back — description / recipe ── */}
+        {hasDescription && (
+          <div
+            className="kc-flip-back flex flex-col items-center justify-center text-center p-4"
+            style={{
+              background: "linear-gradient(145deg, var(--kc-cream) 0%, #fff 100%)",
+              border: "1.5px solid var(--kc-gold-lt)",
+            }}
+          >
+            <h3
+              className="leading-snug mb-2"
+              style={{
+                fontFamily: "var(--font-script)",
+                fontSize: "1.05rem",
+                color: "var(--kc-blue-deep)",
+                fontWeight: 700,
+              }}
+            >
+              {displayName}
+            </h3>
+            <p
+              className="text-xs leading-relaxed"
+              style={{
+                color: "var(--kc-muted)",
+                maxWidth: "90%",
+                display: "-webkit-box",
+                WebkitLineClamp: 5,
+                WebkitBoxOrient: "vertical",
+                overflow: "hidden",
+              }}
+            >
+              {item.description}
+            </p>
+            <p className="font-bold mt-2" style={{ fontSize: "0.875rem", color: "var(--kc-gold)" }}>
+              {price}
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
