@@ -230,13 +230,13 @@ export default function PublicNav({ overlayHero = false }: PublicNavProps) {
       <Link href="/" style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={ghost ? "/logo-light.svg" : "/logo.png"}
+          src="/logo.png"
           alt="Kai's Coffee"
           style={{
             height: 40,
             width: "auto",
-            transition: "opacity 0.35s ease",
-            filter: ghost ? "drop-shadow(0 1px 6px rgba(0,0,0,0.3))" : undefined,
+            transition: "opacity 0.35s ease, filter 0.35s ease",
+            filter: ghost ? "brightness(0) invert(1) drop-shadow(0 1px 6px rgba(0,0,0,0.3))" : undefined,
           }}
         />
       </Link>

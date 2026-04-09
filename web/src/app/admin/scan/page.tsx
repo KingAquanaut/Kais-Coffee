@@ -1,14 +1,18 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import AdminLayout from "@/components/layout/AdminLayout";
-import { admin as adminApi, type ScanRedeemResponse, type ApiError } from "@/lib/api";
+import { admin as adminApi, type ScanRedeemResponse, type ScanStampResponse, type ApiError } from "@/lib/api";
 import { getToken } from "@/contexts/AuthContext";
+
+type SuccessData =
+  | { type: "redeem"; data: ScanRedeemResponse }
+  | { type: "stamp"; data: ScanStampResponse };
 
 type Status =
   | { kind: "idle" }
   | { kind: "scanning" }
   | { kind: "verifying" }
-  | { kind: "success"; data: ScanRedeemResponse }
+  | { kind: "success"; result: SuccessData }
   | { kind: "error"; message: string };
 
 export default function AdminScanPage() {
@@ -25,7 +29,6 @@ export default function AdminScanPage() {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      // Inline cleanup — don't call state setters after unmount
       const scanner = html5QrRef.current as { stop?: () => Promise<void>; clear?: () => void } | null;
       if (scanner) {
         try { scanner.stop?.().catch(() => {}); } catch {}
@@ -45,25 +48,34 @@ export default function AdminScanPage() {
     if (mountedRef.current) setCameraActive(false);
   }, []);
 
-  const handleRedeem = useCallback(async (scannedToken: string) => {
+  const handleScan = useCallback(async (scannedToken: string) => {
     const authToken = getToken();
     if (!authToken) return;
 
-    // Strip prefix if present (QR contains raw 64-hex-char token)
-    const cleaned = scannedToken.trim();
-    if (!/^[a-f0-9]{64}$/i.test(cleaned)) {
-      setStatus({ kind: "error", message: "Invalid QR code format. Expected a 64-character redemption token." });
+    const trimmed = scannedToken.trim();
+
+    // Detect stamp vs redeem by prefix
+    const isStamp = trimmed.startsWith("stamp:");
+    const rawToken = isStamp ? trimmed.slice(6) : trimmed;
+
+    if (!/^[a-f0-9]{64}$/i.test(rawToken)) {
+      setStatus({ kind: "error", message: "Invalid QR code format. Expected a valid token." });
       return;
     }
 
     setStatus({ kind: "verifying" });
     try {
-      const res = await adminApi.users.scanRedeem(authToken, cleaned);
-      setStatus({ kind: "success", data: res });
+      if (isStamp) {
+        const res = await adminApi.users.scanStamp(authToken, rawToken);
+        setStatus({ kind: "success", result: { type: "stamp", data: res } });
+      } else {
+        const res = await adminApi.users.scanRedeem(authToken, rawToken);
+        setStatus({ kind: "success", result: { type: "redeem", data: res } });
+      }
       stopCamera();
     } catch (err) {
       const apiErr = err as ApiError;
-      setStatus({ kind: "error", message: apiErr.message || "Redemption failed." });
+      setStatus({ kind: "error", message: apiErr.message || "Scan failed." });
     }
   }, [stopCamera]);
 
@@ -72,11 +84,9 @@ export default function AdminScanPage() {
     setStatus({ kind: "scanning" });
 
     try {
-      // Dynamic import to avoid SSR issues
       const { Html5Qrcode } = await import("html5-qrcode");
       const scannerId = "kc-qr-scanner";
 
-      // Ensure the DOM element exists and component is still mounted
       if (!scannerRef.current || !mountedRef.current) return;
       scannerRef.current.id = scannerId;
 
@@ -91,19 +101,16 @@ export default function AdminScanPage() {
           aspectRatio: 1,
         },
         (decodedText) => {
-          // On successful scan, stop camera and redeem
           scanner.stop().then(() => {
             try { scanner.clear(); } catch {}
             html5QrRef.current = null;
             if (mountedRef.current) {
               setCameraActive(false);
-              handleRedeem(decodedText);
+              handleScan(decodedText);
             }
           }).catch(() => {});
         },
-        () => {
-          // Ignore scan failures (no QR in frame)
-        },
+        () => {},
       );
 
       if (mountedRef.current) setCameraActive(true);
@@ -114,13 +121,13 @@ export default function AdminScanPage() {
         setCameraActive(false);
       }
     }
-  }, [handleRedeem]);
+  }, [handleScan]);
 
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!manualToken.trim()) return;
     stopCamera();
-    handleRedeem(manualToken);
+    handleScan(manualToken);
   };
 
   const reset = () => {
@@ -133,39 +140,44 @@ export default function AdminScanPage() {
     <AdminLayout>
       <div className="max-w-lg">
         <h1 className="text-2xl font-bold mb-1" style={{ fontFamily: "var(--font-heading)" }}>
-          Scan Reward QR
+          Scan QR Code
         </h1>
         <p className="text-sm mb-6" style={{ color: "var(--kc-muted)" }}>
-          Scan a customer&apos;s QR code to redeem their free coffee.
+          Scan a customer&apos;s QR code to add a stamp or redeem a reward.
         </p>
 
         {/* ── Success ──────────────────────────────────────────────────── */}
-        {status.kind === "success" && (
-          <div className="kc-card p-6 text-center">
-            <div style={{ fontSize: "3rem", marginBottom: "0.5rem" }}>
-              &#9989;
-            </div>
-            <h2 className="text-xl font-bold mb-1" style={{ fontFamily: "var(--font-heading)", color: "var(--kc-success)" }}>
-              {status.data.message}
-            </h2>
-            <p className="text-sm" style={{ color: "var(--kc-muted)" }}>
-              Customer: <strong>{status.data.customer.name}</strong>
-            </p>
-            <div className="grid grid-cols-2 gap-3 mt-4">
-              <div className="p-3 rounded-lg" style={{ background: "var(--kc-bg)" }}>
-                <p className="text-lg font-bold" style={{ color: "var(--kc-gold)" }}>{status.data.points_balance}</p>
-                <p className="text-xs" style={{ color: "var(--kc-muted)" }}>Stamps remaining</p>
+        {status.kind === "success" && (() => {
+          const { result } = status;
+          const d = result.data;
+          const isStamp = result.type === "stamp";
+          return (
+            <div className="kc-card p-6 text-center">
+              <div style={{ fontSize: "3rem", marginBottom: "0.5rem" }}>
+                {isStamp ? "\u2615" : "\u2705"}
               </div>
-              <div className="p-3 rounded-lg" style={{ background: "var(--kc-bg)" }}>
-                <p className="text-lg font-bold" style={{ color: "var(--kc-blue-deep)" }}>{status.data.lifetime_points}</p>
-                <p className="text-xs" style={{ color: "var(--kc-muted)" }}>Lifetime stamps</p>
+              <h2 className="text-xl font-bold mb-1" style={{ fontFamily: "var(--font-heading)", color: "var(--kc-success)" }}>
+                {d.message}
+              </h2>
+              <p className="text-sm" style={{ color: "var(--kc-muted)" }}>
+                Customer: <strong>{d.customer.name}</strong>
+              </p>
+              <div className="grid grid-cols-2 gap-3 mt-4">
+                <div className="p-3 rounded-lg" style={{ background: "var(--kc-bg)" }}>
+                  <p className="text-lg font-bold" style={{ color: "var(--kc-gold)" }}>{d.points_balance}</p>
+                  <p className="text-xs" style={{ color: "var(--kc-muted)" }}>Stamps remaining</p>
+                </div>
+                <div className="p-3 rounded-lg" style={{ background: "var(--kc-bg)" }}>
+                  <p className="text-lg font-bold" style={{ color: "var(--kc-blue-deep)" }}>{d.lifetime_points}</p>
+                  <p className="text-xs" style={{ color: "var(--kc-muted)" }}>Lifetime stamps</p>
+                </div>
               </div>
+              <button onClick={reset} className="kc-btn w-full mt-5">
+                Scan Another
+              </button>
             </div>
-            <button onClick={reset} className="kc-btn w-full mt-5">
-              Scan Another
-            </button>
-          </div>
-        )}
+          );
+        })()}
 
         {/* ── Error ───────────────────────────────────────────────────── */}
         {status.kind === "error" && (
@@ -174,7 +186,7 @@ export default function AdminScanPage() {
               &#10060;
             </div>
             <h2 className="text-lg font-bold mb-1" style={{ fontFamily: "var(--font-heading)", color: "var(--kc-error)" }}>
-              Redemption Failed
+              Scan Failed
             </h2>
             <p className="text-sm mb-4" style={{ color: "var(--kc-muted)" }}>
               {status.message}
@@ -197,7 +209,7 @@ export default function AdminScanPage() {
                 animation: "spin 0.6s linear infinite",
               }}
             />
-            <p className="text-sm font-semibold">Verifying redemption code...</p>
+            <p className="text-sm font-semibold">Verifying code...</p>
           </div>
         )}
 
@@ -248,16 +260,15 @@ export default function AdminScanPage() {
                   className="kc-input flex-1"
                   value={manualToken}
                   onChange={e => setManualToken(e.target.value)}
-                  placeholder="Paste 64-character token"
-                  maxLength={64}
+                  placeholder="Paste token (stamp:... or raw hex)"
                   style={{ fontFamily: "monospace", fontSize: "0.8125rem" }}
                 />
                 <button
                   type="submit"
-                  disabled={manualToken.trim().length !== 64}
+                  disabled={!manualToken.trim()}
                   className="kc-btn kc-btn-gold shrink-0"
                 >
-                  Redeem
+                  Submit
                 </button>
               </form>
             </div>

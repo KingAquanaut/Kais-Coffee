@@ -121,7 +121,7 @@ export default function MenuClient({ categories }: { categories: MenuCategory[] 
           {s.stampSubtext}
         </p>
         <Link href={loggedIn ? "/dashboard" : "/auth/register"} className="kc-btn">
-          {loggedIn ? strings.home.viewMyStamps : s.createAccount}
+          {loggedIn ? strings.home.viewMyStamps : s.joinRewards}
         </Link>
       </div>
     </>

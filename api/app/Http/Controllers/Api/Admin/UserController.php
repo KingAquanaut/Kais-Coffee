@@ -7,6 +7,7 @@ use App\Models\RedemptionToken;
 use App\Models\RewardAccount;
 use App\Models\RewardTransaction;
 use App\Models\Setting;
+use App\Models\StampToken;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -233,6 +234,69 @@ class UserController extends Controller
 
         return response()->json([
             'message'         => 'Free coffee redeemed successfully!',
+            'customer'        => [
+                'id'   => $user->id,
+                'name' => $user->name,
+            ],
+            'points_balance'  => $result->points_balance,
+            'lifetime_points' => $result->lifetime_points,
+            'can_redeem'      => $result->canRedeem($threshold),
+        ]);
+    }
+
+    /**
+     * Verify a scanned stamp QR token and atomically award 1 stamp.
+     */
+    public function scanStamp(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'token' => ['required', 'string', 'size:64'],
+        ]);
+
+        $stampToken = StampToken::findByRaw($data['token']);
+
+        if (! $stampToken) {
+            return response()->json(['message' => 'Invalid stamp code.'], 404);
+        }
+
+        if ($stampToken->isUsed()) {
+            return response()->json(['message' => 'This code has already been used.'], 409);
+        }
+
+        if ($stampToken->isExpired()) {
+            return response()->json(['message' => 'This code has expired. Ask the customer to generate a new one.'], 410);
+        }
+
+        $user    = $stampToken->user;
+        $threshold = (int) Setting::get('points_for_reward', 8);
+
+        // Atomic: lock account, award stamp, mark token used
+        $result = DB::transaction(function () use ($user, $stampToken, $request) {
+            $account = RewardAccount::firstOrCreate(
+                ['user_id' => $user->id],
+                ['points_balance' => 0, 'lifetime_points' => 0]
+            );
+
+            $locked = RewardAccount::lockForUpdate()->find($account->id);
+
+            // Mark token used (inside transaction for atomicity)
+            $stampToken->update(['used_at' => now()]);
+
+            $locked->increment('points_balance', 1);
+            $locked->increment('lifetime_points', 1);
+
+            RewardTransaction::create([
+                'reward_account_id' => $locked->id,
+                'type'              => 'earn',
+                'points'            => 1,
+                'description'       => "QR stamp by {$request->user()->name}",
+            ]);
+
+            return $locked->fresh();
+        });
+
+        return response()->json([
+            'message'         => 'Stamp added!',
             'customer'        => [
                 'id'   => $user->id,
                 'name' => $user->name,

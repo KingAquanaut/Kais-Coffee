@@ -6,6 +6,7 @@ import PointsCard from "@/components/ui/PointsCard";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import RewardCelebration from "@/components/ui/RewardCelebration";
 import QrRedeemCard from "@/components/ui/QrRedeemCard";
+import QrStampCard from "@/components/ui/QrStampCard";
 import { account as accountApi, type DashboardData, type RewardTx, type Paginated } from "@/lib/api";
 import { getToken } from "@/contexts/AuthContext";
 
@@ -225,6 +226,11 @@ export default function DashboardPage() {
               />
             )}
           </section>
+
+          {/* ── QR Stamp (always available) ────────────────────────────────── */}
+          <div className="mt-5">
+            <QrStampCard />
+          </div>
 
           {/* ── QR Redemption ─────────────────────────────────────────────── */}
           {data && (

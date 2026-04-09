@@ -38,6 +38,7 @@ export type RewardSummary = { points_balance: number; lifetime_points: number; t
 export type UserDetail = { user: User & { purchases?: Purchase[] }; reward_summary: RewardSummary; };
 export type QrTokenResponse = { token: string; expires_at: string; ttl: number; };
 export type ScanRedeemResponse = { message: string; customer: { id: number; name: string }; points_balance: number; lifetime_points: number; can_redeem: boolean; };
+export type ScanStampResponse = { message: string; customer: { id: number; name: string }; points_balance: number; lifetime_points: number; can_redeem: boolean; };
 export type RewardTx = { id: number; type: string; points: number; description: string; created_at: string; };
 export type PageContent = Record<string, string | null>;
 
@@ -105,6 +106,8 @@ export const account = {
     req<{ message: string; points_balance: number }>("/account/rewards/redeem", { method: "POST", token }),
   generateQrToken: (token: string) =>
     req<QrTokenResponse>("/account/rewards/qr-token", { method: "POST", token }),
+  generateStampQrToken: (token: string) =>
+    req<QrTokenResponse>("/account/rewards/stamp-qr-token", { method: "POST", token }),
 };
 
 // ── Admin ──────────────────────────────────────────────────────────────────
@@ -123,6 +126,8 @@ export const admin = {
       req<{ message: string; points_balance: number; lifetime_points: number; can_redeem: boolean }>(`/admin/users/${id}/redeem-reward`, { method: "POST", token }),
     scanRedeem: (token: string, qrToken: string) =>
       req<ScanRedeemResponse>("/admin/scan-redeem", { method: "POST", body: { token: qrToken }, token }),
+    scanStamp: (token: string, qrToken: string) =>
+      req<ScanStampResponse>("/admin/scan-stamp", { method: "POST", body: { token: qrToken }, token }),
   },
   menu: {
     categories: (token: string) => req<MenuCategory[]>("/admin/menu/categories", { token }),

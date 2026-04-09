@@ -189,6 +189,69 @@ export function AboutVisitCards({
   );
 }
 
+// ── Social / Contact section ──────────────────────────────────────────────
+const SOCIALS = [
+  { key: "social_instagram", label: "Instagram", icon: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+  )},
+  { key: "social_facebook", label: "Facebook", icon: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+  )},
+  { key: "social_tiktok", label: "TikTok", icon: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"/></svg>
+  )},
+  { key: "social_twitter", label: "X / Twitter", icon: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4l11.733 16h4.267l-11.733-16zM4 20l6.768-6.768M20 4l-6.768 6.768"/></svg>
+  )},
+  { key: "social_email", label: "Email", icon: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 7l-10 7L2 7"/></svg>
+  )},
+  { key: "social_phone", label: "Phone", icon: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+  )},
+];
+
+function AboutSocialSection({ content }: { content: PageContent }) {
+  const links = SOCIALS
+    .map(s => ({ ...s, value: (content[s.key] ?? "") as string }))
+    .filter(s => s.value);
+
+  if (links.length === 0) return null;
+
+  return (
+    <Section>
+      <p className="kc-badge kc-badge-blue mb-4" style={{ display: "inline-flex" }}>Connect with us</p>
+      <SectionHeading>Stay in touch.</SectionHeading>
+      <div className="flex flex-wrap gap-3 mt-6">
+        {links.map(({ key, label, icon, value }) => {
+          const href = key === "social_email"
+            ? `mailto:${value}`
+            : key === "social_phone"
+              ? `tel:${value.replace(/[^\d+]/g, "")}`
+              : value;
+          return (
+            <a
+              key={key}
+              href={href}
+              target={key.startsWith("social_email") || key.startsWith("social_phone") ? undefined : "_blank"}
+              rel="noopener noreferrer"
+              className="kc-card kc-lift"
+              style={{
+                display: "inline-flex", alignItems: "center", gap: "0.5rem",
+                padding: "0.65rem 1.1rem", textDecoration: "none",
+                fontSize: "0.875rem", fontWeight: 600, color: "var(--kc-blue-deep)",
+              }}
+            >
+              {icon}
+              {key === "social_email" ? value : key === "social_phone" ? value : label}
+            </a>
+          );
+        })}
+      </div>
+    </Section>
+  );
+}
+
 // ── Bottom CTA ─────────────────────────────────────────────────────────────
 export function AboutCTA() {
   const { strings: { about: s } } = useLang();
@@ -394,6 +457,9 @@ export function AboutPageContent({ content }: { content: PageContent }) {
           mapEmbedUrl={val("location_map_embed")}
         />
       </Section>
+
+      {/* ── Connect with us ──────────────────────────────────────────── */}
+      <AboutSocialSection content={content} />
 
       <AboutCTA />
       <AboutFooter />

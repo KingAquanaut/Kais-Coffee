@@ -63,7 +63,7 @@ const translations = {
       stampBadge:       "Digital Stamp Card",
       stampTitle:       "8 stamps = a free coffee ☕",
       stampSubtext:     "Earn a digital stamp with every $6+ purchase",
-      createAccount:    "Create Account",
+      joinRewards:      "Join Rewards",
     },
     about: {
       badge:            "Est. 2024",
@@ -147,7 +147,7 @@ const translations = {
       stampBadge:       "Tarjeta Digital de Sellos",
       stampTitle:       "8 sellos = un café gratis ☕",
       stampSubtext:     "Gana un sello digital con cada compra de $6 o más",
-      createAccount:    "Crear Cuenta",
+      joinRewards:      "Unirse a Recompensas",
     },
     about: {
       badge:            "Est. 2024",

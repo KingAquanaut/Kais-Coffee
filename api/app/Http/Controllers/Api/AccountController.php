@@ -7,6 +7,7 @@ use App\Models\RedemptionToken;
 use App\Models\RewardAccount;
 use App\Models\RewardTransaction;
 use App\Models\Setting;
+use App\Models\StampToken;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -121,6 +122,21 @@ class AccountController extends Controller
 
         return response()->json([
             'token'      => $result['token'],
+            'expires_at' => $result['expires_at'],
+            'ttl'        => $result['ttl'],
+        ]);
+    }
+
+    /**
+     * Generate a short-lived QR stamp token.
+     * Any authenticated customer can generate one (no points requirement).
+     */
+    public function generateStampQrToken(Request $request): JsonResponse
+    {
+        $result = StampToken::issue($request->user()->id, 60);
+
+        return response()->json([
+            'token'      => 'stamp:' . $result['token'],
             'expires_at' => $result['expires_at'],
             'ttl'        => $result['ttl'],
         ]);

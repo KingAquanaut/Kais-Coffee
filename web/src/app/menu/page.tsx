@@ -21,7 +21,6 @@ export default async function MenuPage() {
 
       {/* ── Logo ─────────────────────────────────────────────────────────────── */}
       <div className="flex justify-center pt-10 pb-4 px-4">
-        {/* Plain <img> — SVGs in /public don't need Next.js optimisation */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/logo.png"

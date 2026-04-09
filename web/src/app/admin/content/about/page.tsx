@@ -36,6 +36,13 @@ const DEFAULTS = {
   location_hours_saturday: "8 am – 5 pm",
   location_hours_sunday: "9 am – 3 pm",
   location_map_embed: "",
+  // Social media & contact
+  social_instagram: "",
+  social_facebook: "",
+  social_tiktok: "",
+  social_twitter: "",
+  social_email: "",
+  social_phone: "",
   // Spanish overrides — shown when language = Español
   hero_heading_es: "",
   hero_subtext_es: "",
@@ -729,6 +736,69 @@ export default function AdminAboutPage() {
             </p>
           )}
         </Field>
+      </SectionCard>
+
+      {/* ── Contact & Social Media ─────────────────────────────────── */}
+      <SectionCard title="Contact & Social Media">
+        <p className="text-xs -mt-2 mb-2" style={{ color: "var(--kc-muted)" }}>
+          These links appear in the &quot;Connect with us&quot; section on the About page. Leave blank to hide.
+        </p>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <Field label="Instagram URL">
+            <input
+              type="text"
+              value={form.social_instagram}
+              onChange={e => set("social_instagram", e.target.value)}
+              className="kc-input"
+              placeholder="https://instagram.com/kaiscoffee"
+            />
+          </Field>
+          <Field label="Facebook URL">
+            <input
+              type="text"
+              value={form.social_facebook}
+              onChange={e => set("social_facebook", e.target.value)}
+              className="kc-input"
+              placeholder="https://facebook.com/kaiscoffee"
+            />
+          </Field>
+          <Field label="TikTok URL">
+            <input
+              type="text"
+              value={form.social_tiktok}
+              onChange={e => set("social_tiktok", e.target.value)}
+              className="kc-input"
+              placeholder="https://tiktok.com/@kaiscoffee"
+            />
+          </Field>
+          <Field label="X / Twitter URL">
+            <input
+              type="text"
+              value={form.social_twitter}
+              onChange={e => set("social_twitter", e.target.value)}
+              className="kc-input"
+              placeholder="https://x.com/kaiscoffee"
+            />
+          </Field>
+          <Field label="Email address">
+            <input
+              type="text"
+              value={form.social_email}
+              onChange={e => set("social_email", e.target.value)}
+              className="kc-input"
+              placeholder="hello@kaiscoffee.com"
+            />
+          </Field>
+          <Field label="Phone number">
+            <input
+              type="text"
+              value={form.social_phone}
+              onChange={e => set("social_phone", e.target.value)}
+              className="kc-input"
+              placeholder="(817) 555-0123"
+            />
+          </Field>
+        </div>
       </SectionCard>
 
       {/* Sticky bottom save bar */}
