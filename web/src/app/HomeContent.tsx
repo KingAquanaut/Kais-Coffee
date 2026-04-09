@@ -3,6 +3,7 @@
 // Receives dynamic API data as props; reads translations client-side.
 import Link from "next/link";
 import { useLang } from "@/contexts/LangContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 // ── Stamp preview (decorative, no translations needed) ────────────────────────
 function StampPreview() {
@@ -84,6 +85,8 @@ export function HeroText({
 // ── Hero CTA buttons — translated ─────────────────────────────────────────────
 export function HeroButtons({ hasPhoto }: { hasPhoto: boolean }) {
   const { strings } = useLang();
+  const { user } = useAuth();
+  const loggedIn = Boolean(user);
   return (
     <div className="flex flex-col sm:flex-row gap-3" style={{ marginTop: "0.25rem" }}>
       <Link
@@ -94,7 +97,7 @@ export function HeroButtons({ hasPhoto }: { hasPhoto: boolean }) {
         {strings.home.exploreMenu}
       </Link>
       <Link
-        href="/auth/register"
+        href={loggedIn ? "/dashboard" : "/auth/register"}
         className="kc-btn kc-btn-outline px-8 py-3 text-sm"
         style={hasPhoto ? {
           borderColor: "rgba(255,255,255,0.52)",
@@ -104,7 +107,7 @@ export function HeroButtons({ hasPhoto }: { hasPhoto: boolean }) {
           WebkitBackdropFilter: "blur(4px)",
         } : undefined}
       >
-        {strings.home.joinRewards}
+        {loggedIn ? strings.nav.myRewards : strings.home.joinRewards}
       </Link>
     </div>
   );
@@ -132,6 +135,8 @@ export function HeroBadge({ hasPhoto }: { hasPhoto: boolean }) {
 // ── Stamp card section ────────────────────────────────────────────────────────
 export function StampSection() {
   const { strings } = useLang();
+  const { user } = useAuth();
+  const loggedIn = Boolean(user);
   const s = strings.home;
   return (
     <section className="px-6 py-16">
@@ -152,8 +157,8 @@ export function StampSection() {
         <p className="text-xs" style={{ color: "var(--kc-muted)", marginBottom: "1.5rem" }}>
           {s.stampExample}
         </p>
-        <Link href="/auth/register" className="kc-btn kc-btn-gold inline-flex">
-          {s.startCollecting}
+        <Link href={loggedIn ? "/dashboard" : "/auth/register"} className="kc-btn kc-btn-gold inline-flex">
+          {loggedIn ? s.viewMyStamps : s.startCollecting}
         </Link>
       </div>
     </section>

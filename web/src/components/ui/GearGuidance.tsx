@@ -7,6 +7,7 @@ import { useLang } from "@/contexts/LangContext";
  * teaching users they can change their language later.
  *
  * Appears after the first language pick (listens for "kc-lang-first-pick" event).
+ * Positions itself dynamically below the #kc-settings-gear button.
  * Auto-dismisses after a few seconds, or on click.
  * Only shows once (tracked by localStorage).
  */
@@ -16,6 +17,7 @@ const SHOWN_KEY = "kc-gear-guidance-shown";
 export default function GearGuidance() {
   const { strings } = useLang();
   const [show, setShow] = useState(false);
+  const [pos, setPos] = useState<{ top: number; right: number; arrowRight: number } | null>(null);
 
   const dismiss = useCallback(() => {
     setShow(false);
@@ -27,7 +29,19 @@ export default function GearGuidance() {
     if (alreadyShown) return;
 
     const handlePick = () => {
-      setTimeout(() => setShow(true), 600);
+      setTimeout(() => {
+        const gear = document.getElementById("kc-settings-gear");
+        if (gear) {
+          const rect = gear.getBoundingClientRect();
+          const gearCenterFromRight = window.innerWidth - (rect.left + rect.width / 2);
+          setPos({
+            top: rect.bottom + 8,
+            right: Math.max(12, gearCenterFromRight - 120),
+            arrowRight: Math.max(16, gearCenterFromRight - Math.max(12, gearCenterFromRight - 120) - 6),
+          });
+        }
+        setShow(true);
+      }, 600);
     };
 
     globalThis.addEventListener("kc-lang-first-pick", handlePick);
@@ -40,7 +54,7 @@ export default function GearGuidance() {
     return () => clearTimeout(timer);
   }, [show, dismiss]);
 
-  if (!show) return null;
+  if (!show || !pos) return null;
 
   return (
     <button
@@ -49,8 +63,8 @@ export default function GearGuidance() {
       className="kc-guidance-btn"
       style={{
         position: "fixed",
-        top: 56,
-        right: 12,
+        top: pos.top,
+        right: pos.right,
         zIndex: 9997,
         cursor: "pointer",
         background: "none",
@@ -59,13 +73,13 @@ export default function GearGuidance() {
         textAlign: "left",
       }}
     >
-      {/* Arrow pointing up-right toward the gear */}
+      {/* Arrow pointing up toward the gear */}
       <div
         aria-hidden="true"
         style={{
           position: "absolute",
           top: -6,
-          right: 16,
+          right: pos.arrowRight,
           width: 12,
           height: 12,
           background: "var(--kc-cream)",

@@ -71,6 +71,7 @@ export default function SettingsMenu({ ghost = false }: Props) {
     <div ref={ref} style={{ position: "relative" }}>
       {/* Trigger button */}
       <button
+        id="kc-settings-gear"
         onClick={() => setOpen(o => !o)}
         onMouseEnter={() => setHover(true)}
         onMouseLeave={() => setHover(false)}

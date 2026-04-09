@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LangContext";
 import SettingsMenu from "@/components/ui/SettingsMenu";
@@ -43,6 +43,7 @@ function UserMenu({
   const [open, setOpen] = useState(false);
   const ref             = useRef<HTMLDivElement>(null);
   const router          = useRouter();
+  const pathname        = usePathname();
   const { strings }     = useLang();
 
   useEffect(() => {
@@ -144,25 +145,29 @@ function UserMenu({
             </p>
           </div>
 
-          {links.map(({ href, label }) => (
-            <Link
-              key={href}
-              href={href}
-              role="menuitem"
-              onClick={() => setOpen(false)}
-              style={{
-                display: "block",
-                padding: "0.6rem 1rem",
-                fontSize: "0.875rem", fontWeight: 600,
-                color: "var(--kc-black)",
-                textDecoration: "none",
-                borderBottom: "1px solid var(--kc-cream-dark)",
-              }}
-              className="hover:bg-(--kc-bg)"
-            >
-              {label}
-            </Link>
-          ))}
+          {links.map(({ href, label }) => {
+            const active = pathname.startsWith(href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                role="menuitem"
+                onClick={() => setOpen(false)}
+                style={{
+                  display: "block",
+                  padding: "0.6rem 1rem",
+                  fontSize: "0.875rem", fontWeight: active ? 800 : 600,
+                  color: active ? "var(--kc-gold)" : "var(--kc-black)",
+                  textDecoration: "none",
+                  borderBottom: "1px solid var(--kc-cream-dark)",
+                  background: active ? "var(--kc-bg)" : undefined,
+                }}
+                className="hover:bg-(--kc-bg)"
+              >
+                {label}
+              </Link>
+            );
+          })}
 
           <button
             role="menuitem"
@@ -193,6 +198,7 @@ interface PublicNavProps {
 export default function PublicNav({ overlayHero = false }: PublicNavProps) {
   const { user, logout } = useAuth();
   const { strings }      = useLang();
+  const pathname         = usePathname();
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -241,10 +247,16 @@ export default function PublicNav({ overlayHero = false }: PublicNavProps) {
           href="/about"
           className="text-sm font-semibold"
           style={{
-            color: ghost ? "rgba(255,255,255,0.88)" : "var(--kc-black)",
+            color: ghost
+              ? "rgba(255,255,255,0.88)"
+              : pathname === "/about" ? "var(--kc-gold)" : "var(--kc-black)",
             textDecoration: "none",
             transition: "color 0.35s ease",
             textShadow: ghost ? "0 1px 6px rgba(0,0,0,0.28)" : "none",
+            borderBottom: pathname === "/about"
+              ? `2px solid ${ghost ? "rgba(255,255,255,0.7)" : "var(--kc-gold)"}`
+              : "2px solid transparent",
+            paddingBottom: "0.15rem",
           }}
         >
           {strings.nav.aboutUs}
@@ -260,6 +272,10 @@ export default function PublicNav({ overlayHero = false }: PublicNavProps) {
             color: "#fff",
             backdropFilter: "blur(6px)",
             WebkitBackdropFilter: "blur(6px)",
+          } : pathname === "/menu" ? {
+            background: "var(--kc-gold)",
+            borderColor: "var(--kc-gold)",
+            color: "#fff",
           } : undefined}
         >
           {strings.nav.menu}

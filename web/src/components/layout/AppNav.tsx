@@ -68,7 +68,8 @@ export default function AppNav() {
               href={href}
               className="flex-1 flex flex-col items-center justify-center py-3 gap-0.5"
               style={{
-                color: active ? "var(--kc-black)" : "var(--kc-muted)",
+                position: "relative",
+                color: active ? "var(--kc-gold)" : "var(--kc-muted)",
                 fontWeight: active ? 700 : 400,
                 fontSize: "0.6875rem",
                 letterSpacing: "0.05em",
@@ -76,6 +77,13 @@ export default function AppNav() {
                 textDecoration: "none",
               }}
             >
+              {active && (
+                <span style={{
+                  position: "absolute", top: 0, left: "50%", transform: "translateX(-50%)",
+                  width: 24, height: 2.5, borderRadius: 2,
+                  background: "var(--kc-gold)",
+                }} />
+              )}
               <span style={{ fontSize: "1.125rem" }}>{icon}</span>
               {tabLabels[labelKey]}
             </Link>
