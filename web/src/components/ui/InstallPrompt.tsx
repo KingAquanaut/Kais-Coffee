@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 interface BeforeInstallPromptEvent extends Event {
@@ -12,21 +12,26 @@ type PromptMode = "chromium" | "safari" | null;
 const DISMISSED_KEY = "kc_install_dismissed";
 const INSTALLED_SEEN_KEY = "kc_installed_seen";
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Detection helpers (client-only, safe to call in lazy initialisers) ───────
 function isStandalone(): boolean {
   if (typeof window === "undefined") return false;
-  // Standard check (Chrome, Edge, Firefox)
   if (window.matchMedia("(display-mode: standalone)").matches) return true;
-  // Safari on iOS sets this when launched from the home screen
-  if ("standalone" in window.navigator && (navigator as unknown as { standalone: boolean }).standalone) return true;
+  if (
+    "standalone" in window.navigator &&
+    (navigator as unknown as { standalone: boolean }).standalone
+  )
+    return true;
   return false;
 }
 
 function isSafariIOS(): boolean {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent;
-  // Must be iOS (iPhone/iPad/iPod) and NOT Chrome/Firefox/Edge on iOS
-  return /iP(hone|ad|od)/.test(ua) && /WebKit/.test(ua) && !/CriOS|FxiOS|EdgiOS/.test(ua);
+  return (
+    /iP(hone|ad|od)/.test(ua) &&
+    /WebKit/.test(ua) &&
+    !/CriOS|FxiOS|EdgiOS/.test(ua)
+  );
 }
 
 function isAdminRoute(): boolean {
@@ -34,41 +39,88 @@ function isAdminRoute(): boolean {
   return window.location.pathname.startsWith("/admin");
 }
 
-// ── Installed Toast (auto-dismissing confirmation) ──────────────────────────
-function InstalledToast({ onDone }: { onDone: () => void }) {
-  const [fading, setFading] = useState(false);
+// ── Installed Toast ─────────────────────────────────────────────────────────
+// Slides up, holds for 4 s, fades out, then unmounts.
+function InstalledToast({ onDone }: Readonly<{ onDone: () => void }>) {
+  const [phase, setPhase] = useState<"enter" | "visible" | "exit">("enter");
+  const onDoneRef = useRef(onDone);
 
   useEffect(() => {
-    const fadeTimer = setTimeout(() => setFading(true), 2500);
-    const removeTimer = setTimeout(onDone, 3200);
-    return () => {
-      clearTimeout(fadeTimer);
-      clearTimeout(removeTimer);
-    };
+    onDoneRef.current = onDone;
   }, [onDone]);
+
+  useEffect(() => {
+    // enter → visible on next frame (allows CSS transition to trigger)
+    const raf = requestAnimationFrame(() => setPhase("visible"));
+    return () => cancelAnimationFrame(raf);
+  }, []);
+
+  useEffect(() => {
+    if (phase !== "visible") return;
+    const exitTimer = setTimeout(() => setPhase("exit"), 4000);
+    return () => clearTimeout(exitTimer);
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase !== "exit") return;
+    const removeTimer = setTimeout(() => onDoneRef.current(), 700);
+    return () => clearTimeout(removeTimer);
+  }, [phase]);
+
+  const opacity = phase === "visible" ? 1 : 0;
+  const translateY = phase === "enter" ? "16px" : "0px";
 
   return (
     <div
       role="status"
-      className="fixed bottom-4 left-4 right-4 z-50 kc-card px-4 py-3 flex items-center gap-3"
+      className="fixed bottom-4 left-4 right-4 z-50 flex items-center gap-3"
       style={{
-        boxShadow: "0 4px 24px rgba(26,26,26,0.12)",
-        maxWidth: "360px",
+        maxWidth: "340px",
         margin: "0 auto",
+        padding: "14px 18px",
+        borderRadius: "16px",
         border: "1.5px solid var(--kc-gold-lt)",
-        opacity: fading ? 0 : 1,
-        transition: "opacity 0.7s ease-out",
+        background: "rgba(250,247,242,0.85)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
+        boxShadow:
+          "0 8px 32px rgba(26,26,26,0.10), 0 1.5px 4px rgba(26,26,26,0.06)",
+        opacity,
+        transform: `translateY(${translateY})`,
+        transition:
+          "opacity 0.5s cubic-bezier(.4,0,.2,1), transform 0.5s cubic-bezier(.4,0,.2,1)",
+        pointerEvents: phase === "exit" ? "none" : "auto",
       }}
     >
-      <span style={{ fontSize: "1.1rem", lineHeight: 1 }}>✓</span>
+      <span
+        aria-hidden="true"
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          width: 28,
+          height: 28,
+          borderRadius: "50%",
+          background: "var(--kc-gold-lt)",
+          color: "var(--kc-gold)",
+          fontSize: "0.85rem",
+          fontWeight: 700,
+          flexShrink: 0,
+        }}
+      >
+        ✓
+      </span>
       <div className="flex-1 min-w-0">
         <p
           className="font-bold text-sm leading-snug"
-          style={{ fontFamily: "var(--font-heading)" }}
+          style={{ fontFamily: "var(--font-heading)", color: "var(--kc-black)" }}
         >
           Kai&apos;s Coffee Installed
         </p>
-        <p className="text-xs mt-0.5" style={{ color: "var(--kc-muted)" }}>
+        <p
+          className="text-xs"
+          style={{ color: "var(--kc-muted)", marginTop: 2 }}
+        >
           You&apos;re all set — works offline too.
         </p>
       </div>
@@ -76,26 +128,34 @@ function InstalledToast({ onDone }: { onDone: () => void }) {
   );
 }
 
-// ── Component ────────────────────────────────────────────────────────────────
+// ── Main Component ──────────────────────────────────────────────────────────
 export default function InstallPrompt() {
-  const [nativePrompt, setNativePrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [nativePrompt, setNativePrompt] =
+    useState<BeforeInstallPromptEvent | null>(null);
   const [mode, setMode] = useState<PromptMode>(null);
   const [visible, setVisible] = useState(false);
-  const [showInstalledToast, setShowInstalledToast] = useState(false);
+
+  // Derive the initial toast state lazily so we never call setState
+  // synchronously inside an effect (react-hooks/set-state-in-effect).
+  const [showInstalledToast, setShowInstalledToast] = useState(() => {
+    if (typeof window === "undefined") return false;
+    if (isAdminRoute()) return false;
+    if (!isStandalone()) return false;
+    if (localStorage.getItem(INSTALLED_SEEN_KEY)) return false;
+    return true;
+  });
+
+  // Persist the "seen" flag when the toast first shows (covers both the
+  // lazy-init path above and the appinstalled event path below).
+  useEffect(() => {
+    if (showInstalledToast) {
+      localStorage.setItem(INSTALLED_SEEN_KEY, "1");
+    }
+  }, [showInstalledToast]);
 
   useEffect(() => {
-    // Skip admin routes entirely
-    if (isAdminRoute()) return;
-
-    // ── Installed state: show a one-time confirmation toast ──
-    if (isStandalone()) {
-      if (!localStorage.getItem(INSTALLED_SEEN_KEY)) {
-        localStorage.setItem(INSTALLED_SEEN_KEY, "1");
-        setShowInstalledToast(true);
-      }
-      return;
-    }
-
+    // Skip if already in standalone/installed mode or on admin routes
+    if (isAdminRoute() || isStandalone()) return;
     // Previously dismissed this session
     if (sessionStorage.getItem(DISMISSED_KEY)) return;
 
@@ -112,18 +172,16 @@ export default function InstallPrompt() {
     const onAppInstalled = () => {
       setVisible(false);
       setShowInstalledToast(true);
-      localStorage.setItem(INSTALLED_SEEN_KEY, "1");
     };
     window.addEventListener("appinstalled", onAppInstalled);
 
     // ── Safari iOS: show manual instructions after a short delay ──
-    // Only if beforeinstallprompt hasn't fired (Safari never fires it)
     const safariTimer = setTimeout(() => {
       if (isSafariIOS()) {
         setMode("safari");
         setVisible(true);
       }
-    }, 3000); // Wait 3s so the page feels settled before prompting
+    }, 3000);
 
     return () => {
       window.removeEventListener("beforeinstallprompt", onBeforeInstall);
@@ -135,7 +193,6 @@ export default function InstallPrompt() {
   const handleInstall = useCallback(async () => {
     if (!nativePrompt) return;
     await nativePrompt.prompt();
-    // appinstalled event handles the success UI transition
     await nativePrompt.userChoice;
   }, [nativePrompt]);
 
@@ -144,13 +201,14 @@ export default function InstallPrompt() {
     setVisible(false);
   }, []);
 
-  // ── Installed toast (auto-dismissing) ──
+  // ── Render: installed toast ──
   if (showInstalledToast) {
     return <InstalledToast onDone={() => setShowInstalledToast(false)} />;
   }
 
   if (!visible) return null;
 
+  // ── Render: install prompt ──
   return (
     <div
       role="banner"
@@ -173,41 +231,68 @@ export default function InstallPrompt() {
             className="font-bold text-sm leading-snug"
             style={{ fontFamily: "var(--font-heading)" }}
           >
-            {mode === "safari" ? "Get the Kai's Coffee App" : "Add to Home Screen"}
+            {mode === "safari"
+              ? "Get the Kai\u2019s Coffee App"
+              : "Add to Home Screen"}
           </p>
           <p className="text-xs mt-0.5" style={{ color: "var(--kc-muted)" }}>
             {mode === "safari"
-              ? "Install for the full app experience — works offline too."
-              : "Get the full app experience — works offline too."}
+              ? "Install for the full app experience \u2014 works offline too."
+              : "Get the full app experience \u2014 works offline too."}
           </p>
         </div>
       </div>
 
-      {/* ── Safari iOS: step-by-step share sheet instructions ── */}
       {mode === "safari" && (
         <div
           className="mt-3 rounded-xl px-3 py-2.5 flex flex-col gap-1.5"
-          style={{ background: "var(--kc-bg)", border: "1px solid var(--kc-border)", borderColor: "rgba(26,26,26,0.08)" }}
+          style={{
+            background: "var(--kc-bg)",
+            border: "1px solid rgba(26,26,26,0.08)",
+          }}
         >
-          <p className="text-xs font-semibold" style={{ color: "var(--kc-black)" }}>
+          <p
+            className="text-xs font-semibold"
+            style={{ color: "var(--kc-black)" }}
+          >
             How to install:
           </p>
-          <p className="text-xs" style={{ color: "var(--kc-muted)", lineHeight: 1.6 }}>
-            1. Tap the <strong style={{ color: "var(--kc-blue-deep)" }}>Share</strong> button
-            <span style={{ fontSize: "0.8rem" }}> (the square with an arrow)</span>
+          <p
+            className="text-xs"
+            style={{ color: "var(--kc-muted)", lineHeight: 1.6 }}
+          >
+            1. Tap the{" "}
+            <strong style={{ color: "var(--kc-blue-deep)" }}>Share</strong>{" "}
+            button
+            <span style={{ fontSize: "0.8rem" }}>
+              {" "}
+              (the square with an arrow)
+            </span>
           </p>
-          <p className="text-xs" style={{ color: "var(--kc-muted)", lineHeight: 1.6 }}>
-            2. Scroll down and tap <strong style={{ color: "var(--kc-blue-deep)" }}>Add to Home Screen</strong>
+          <p
+            className="text-xs"
+            style={{ color: "var(--kc-muted)", lineHeight: 1.6 }}
+          >
+            2. Scroll down and tap{" "}
+            <strong style={{ color: "var(--kc-blue-deep)" }}>
+              Add to Home Screen
+            </strong>
           </p>
-          <p className="text-xs" style={{ color: "var(--kc-muted)", lineHeight: 1.6 }}>
-            3. Tap <strong style={{ color: "var(--kc-blue-deep)" }}>Add</strong>
+          <p
+            className="text-xs"
+            style={{ color: "var(--kc-muted)", lineHeight: 1.6 }}
+          >
+            3. Tap{" "}
+            <strong style={{ color: "var(--kc-blue-deep)" }}>Add</strong>
           </p>
         </div>
       )}
 
-      {/* ── Actions ── */}
       <div className="flex gap-2 justify-end mt-3">
-        <button onClick={handleDismiss} className="kc-btn kc-btn-sm kc-btn-outline">
+        <button
+          onClick={handleDismiss}
+          className="kc-btn kc-btn-sm kc-btn-outline"
+        >
           Not now
         </button>
         {mode === "chromium" && (
