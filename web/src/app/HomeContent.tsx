@@ -5,31 +5,53 @@ import Link from "next/link";
 import { useLang } from "@/contexts/LangContext";
 import { useAuth } from "@/contexts/AuthContext";
 
-// ── Stamp preview (decorative, no translations needed) ────────────────────────
-function StampPreview() {
+// ── Stamp card preview (matches dashboard PointsCard look) ───────────────────
+function StampCardPreview({ exampleLabel }: { exampleLabel: string }) {
+  const filled = 5;
+  const total = 8;
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.6rem", margin: "1.75rem auto", maxWidth: 220 }}>
-      {Array.from({ length: 8 }).map((_, i) => {
-        const filled  = i < 5;
-        const isFinal = i === 7;
-        return (
-          <div
-            key={i}
-            style={{
-              aspectRatio: "1",
-              borderRadius: "50%",
-              border: filled ? "2px solid var(--kc-gold)" : "2px dashed rgba(26,26,26,0.18)",
-              background: filled ? "var(--kc-gold-lt)" : "transparent",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: "0.8rem",
-            }}
-          >
-            {filled ? "☕" : isFinal ? (
-              <span style={{ fontSize: "0.38rem", fontWeight: 900, letterSpacing: "0.07em", color: "var(--kc-muted)", fontFamily: "var(--font-heading)", lineHeight: 1 }}>FREE</span>
-            ) : null}
-          </div>
-        );
-      })}
+    <div
+      className="kc-card"
+      style={{ padding: "1.25rem 1.5rem", maxWidth: 320, margin: "1.75rem auto" }}
+    >
+      {/* Card header */}
+      <div className="flex items-center justify-between mb-4">
+        <span className="kc-badge kc-badge-gold" style={{ fontSize: "0.625rem" }}>
+          Digital Stamp Card
+        </span>
+        <span className="text-xs font-semibold" style={{ color: "var(--kc-muted)" }}>
+          {filled} / {total}
+        </span>
+      </div>
+
+      {/* Stamp grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "0.65rem" }}>
+        {Array.from({ length: total }).map((_, i) => {
+          const isFilled = i < filled;
+          const isFinal = i === total - 1;
+          return (
+            <div
+              key={i}
+              style={{
+                width: "100%", aspectRatio: "1", borderRadius: "50%",
+                background: isFilled ? "var(--kc-gold-lt)" : "var(--kc-bg)",
+                border: isFilled ? "2px solid var(--kc-gold)" : "2px dashed var(--kc-border)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "clamp(0.75rem, 2.5vw, 1rem)",
+              }}
+            >
+              {isFilled ? "☕" : isFinal ? (
+                <span style={{ fontSize: "0.5rem", fontWeight: 900, letterSpacing: "0.04em", color: "var(--kc-muted)", fontFamily: "var(--font-heading)", lineHeight: 1 }}>FREE</span>
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Example label */}
+      <p className="text-xs mt-3 text-center" style={{ color: "var(--kc-muted)" }}>
+        {exampleLabel}
+      </p>
     </div>
   );
 }
@@ -153,10 +175,7 @@ export function StampSection() {
         <p className="text-sm mt-3" style={{ color: "var(--kc-muted)", lineHeight: 1.8 }}>
           {s.stampSubtext}
         </p>
-        <StampPreview />
-        <p className="text-xs" style={{ color: "var(--kc-muted)", marginBottom: "1.5rem" }}>
-          {s.stampExample}
-        </p>
+        <StampCardPreview exampleLabel={s.stampExample} />
         <Link href={loggedIn ? "/dashboard" : "/auth/register"} className="kc-btn kc-btn-gold inline-flex">
           {loggedIn ? s.viewMyStamps : s.startCollecting}
         </Link>

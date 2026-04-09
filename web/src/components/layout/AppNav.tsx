@@ -39,9 +39,38 @@ export default function AppNav() {
         className="sticky top-0 z-40 flex items-center justify-between px-6 py-4"
         style={{ background: "var(--kc-bg)", borderBottom: "1.5px solid var(--kc-border)" }}
       >
-        <Link href="/dashboard" className="font-bold text-lg" style={{ fontFamily: "var(--font-heading)" }}>
-          Kai&apos;s Coffee
-        </Link>
+        <div className="flex items-center gap-4">
+          <Link href="/" className="font-bold text-lg" style={{ fontFamily: "var(--font-heading)" }}>
+            Kai&apos;s Coffee
+          </Link>
+          <div className="hidden sm:flex items-center gap-3">
+            {[
+              { href: "/menu", label: strings.nav.menu },
+              { href: "/dashboard", label: strings.nav.myRewards },
+              { href: "/purchases", label: strings.nav.purchaseHistory },
+              { href: "/profile", label: strings.nav.accountSettings },
+            ].map(({ href, label }) => {
+              const active = pathname === href || (href !== "/" && pathname.startsWith(href));
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className="text-sm"
+                  style={{
+                    fontWeight: active ? 700 : 500,
+                    color: active ? "var(--kc-gold)" : "var(--kc-muted)",
+                    textDecoration: "none",
+                    borderBottom: active ? "2px solid var(--kc-gold)" : "2px solid transparent",
+                    paddingBottom: "0.15rem",
+                    transition: "color 0.2s, border-color 0.2s",
+                  }}
+                >
+                  {label}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
         <div className="flex items-center gap-2">
           {user && (
             <span className="text-sm hidden sm:block" style={{ color: "var(--kc-muted)" }}>
