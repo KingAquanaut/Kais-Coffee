@@ -226,19 +226,19 @@ export default function PublicNav({ overlayHero = false }: PublicNavProps) {
         transition: "background 0.35s ease, border-color 0.35s ease",
       }}
     >
-      {/* Left: brand */}
-      <Link
-        href="/"
-        className="font-bold text-xl"
-        style={{
-          fontFamily: "var(--font-heading)",
-          color: ghost ? "#fff" : "var(--kc-black)",
-          textDecoration: "none",
-          transition: "color 0.35s ease",
-          textShadow: ghost ? "0 1px 8px rgba(0,0,0,0.32)" : "none",
-        }}
-      >
-        Kai&apos;s Coffee
+      {/* Left: brand logo */}
+      <Link href="/" style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={ghost ? "/logo-light.svg" : "/logo.png"}
+          alt="Kai's Coffee"
+          style={{
+            height: 40,
+            width: "auto",
+            transition: "opacity 0.35s ease",
+            filter: ghost ? "drop-shadow(0 1px 6px rgba(0,0,0,0.3))" : undefined,
+          }}
+        />
       </Link>
 
       {/* Right: nav links + settings + account */}

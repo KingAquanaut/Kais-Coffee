@@ -12,6 +12,7 @@ class MenuCategory extends Model
 
     protected $fillable = [
         'name',
+        'name_es',
         'slug',
         'description',
         'image_url',

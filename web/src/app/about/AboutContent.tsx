@@ -323,15 +323,6 @@ export function AboutPageContent({ content }: { content: PageContent }) {
         )}
 
         <div className="relative flex flex-col items-center gap-4" style={{ zIndex: 2 }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/logo.png"
-            alt="Kai's Coffee"
-            style={{
-              width: "min(260px, 70vw)", height: "auto", marginBottom: "0.5rem",
-              filter: heroImageUrl ? "drop-shadow(0 4px 18px rgba(0,0,0,0.38))" : undefined,
-            }}
-          />
           <AboutHeroBadge hasPhoto={Boolean(heroImageUrl)} />
           <h1
             className="text-3xl sm:text-4xl md:text-6xl font-bold"

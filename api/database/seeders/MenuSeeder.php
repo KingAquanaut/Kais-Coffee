@@ -14,6 +14,7 @@ class MenuSeeder extends Seeder
         $menu = [
             [
                 'name'        => 'Coffee & Lattes',
+                'name_es'     => 'Café y Lattes',
                 'description' => '12 oz · 2 shots of espresso · whole milk · Oat milk +$1 · 16 oz upgrade +$1',
                 'sort_order'  => 1,
                 'items'       => [
@@ -141,6 +142,7 @@ class MenuSeeder extends Seeder
             ],
             [
                 'name'        => 'Lemonade',
+                'name_es'     => 'Limonada',
                 'description' => 'Hand-crafted lemonades made with real fruit and house syrups.',
                 'sort_order'  => 2,
                 'items'       => [
@@ -180,6 +182,7 @@ class MenuSeeder extends Seeder
             ],
             [
                 'name'        => 'Matcha',
+                'name_es'     => 'Matcha',
                 'description' => 'Premium ceremonial-grade matcha, available hot or iced.',
                 'sort_order'  => 3,
                 'items'       => [
@@ -219,6 +222,7 @@ class MenuSeeder extends Seeder
             ],
             [
                 'name'        => 'Seasonal Drinks',
+                'name_es'     => 'Bebidas de Temporada',
                 'description' => 'Rotating specials that follow what\'s fresh — available for a limited time.',
                 'sort_order'  => 4,
                 'items'       => [
@@ -261,6 +265,7 @@ class MenuSeeder extends Seeder
         foreach ($menu as $catData) {
             $category = MenuCategory::create([
                 'name'        => $catData['name'],
+                'name_es'     => $catData['name_es'] ?? null,
                 'slug'        => Str::slug($catData['name']),
                 'description' => $catData['description'],
                 'sort_order'  => $catData['sort_order'],

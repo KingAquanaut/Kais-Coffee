@@ -29,7 +29,7 @@ function MenuTile({ item }: { item: MenuItem }) {
 
 // ── Interactive menu + loyalty CTA ────────────────────────────────────────────
 export default function MenuClient({ categories }: { categories: MenuCategory[] }) {
-  const { strings } = useLang();
+  const { lang, strings } = useLang();
   const { user } = useAuth();
   const loggedIn = Boolean(user);
   const s = strings.menu;
@@ -69,7 +69,7 @@ export default function MenuClient({ categories }: { categories: MenuCategory[] 
                     padding:       "0.4rem 1.1rem",
                   }}
                 >
-                  {cat.name}
+                  {(lang === "es" && cat.name_es) ? cat.name_es : cat.name}
                 </button>
               );
             })}

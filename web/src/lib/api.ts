@@ -10,7 +10,7 @@ export type User = {
 };
 export type RewardAccount = { id: number; user_id: number; points_balance: number; lifetime_points: number; };
 export type MenuCategory = {
-  id: number; name: string; slug: string; description: string | null; image_url: string | null;
+  id: number; name: string; name_es: string | null; slug: string; description: string | null; image_url: string | null;
   sort_order: number; is_active: boolean; active_items?: MenuItem[];
 };
 export type MenuItem = {
