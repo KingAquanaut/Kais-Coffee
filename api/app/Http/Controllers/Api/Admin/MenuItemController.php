@@ -58,14 +58,21 @@ class MenuItemController extends Controller
             'description'      => ['nullable', 'string'],
             'price'            => ['sometimes', 'numeric', 'min:0'],
             'image_url'        => ['nullable', 'url'],
-            'is_active'        => ['nullable', 'boolean'],
-            'is_featured'      => ['nullable', 'boolean'],
-            'is_seasonal'      => ['nullable', 'boolean'],
+            'is_active'        => ['sometimes', 'boolean'],
+            'is_featured'      => ['sometimes', 'boolean'],
+            'is_seasonal'      => ['sometimes', 'boolean'],
             'sort_order'       => ['nullable', 'integer'],
         ]);
 
         if (isset($data['name'])) {
             $data['slug'] = Str::slug($data['name']) . '-' . Str::random(4);
+        }
+
+        // Ensure boolean toggles are explicitly set even when false
+        foreach (['is_active', 'is_featured', 'is_seasonal'] as $toggle) {
+            if ($request->has($toggle)) {
+                $data[$toggle] = (bool) $request->input($toggle);
+            }
         }
 
         $menuItem->update($data);
