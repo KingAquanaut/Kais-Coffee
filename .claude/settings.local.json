@@ -1,7 +1,16 @@
 {
   "permissions": {
     "allow": [
-      "Bash(php artisan:*)"
+      "Bash(php artisan:*)",
+      "Bash(npm install:*)",
+      "Bash(npm --version)",
+      "Bash(npx tsc:*)",
+      "Bash(composer install:*)",
+      "Bash(php -v)",
+      "Bash(git -C /c/kais-coffee show 76e4456:web/src/app/admin/menu/page.tsx)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }

@@ -22,15 +22,16 @@ const withPWA = require("next-pwa")({
       },
     },
 
-    // Public menu API — network-first with 5 s timeout, 24 h cache
-    // Lets the menu page work offline after first load
+    // Public menu API — network-first with 5 s timeout, 4 h cache.
+    // 4 h balances offline resilience (covers a commute or café visit
+    // without network) against freshness after admin menu edits.
     {
       urlPattern: /\/api\/v1\/menu\/.*/i,
       handler: "NetworkFirst",
       options: {
         cacheName: "menu-api",
         networkTimeoutSeconds: 5,
-        expiration: { maxEntries: 20, maxAgeSeconds: 24 * 60 * 60 },
+        expiration: { maxEntries: 20, maxAgeSeconds: 4 * 60 * 60 },
         cacheableResponse: { statuses: [0, 200] },
       },
     },
@@ -71,15 +72,27 @@ const withPWA = require("next-pwa")({
       },
     },
 
-    // HTML page navigations — network-first with 3 s timeout, 24 h cache
-    // Covers /, /menu, /dashboard, /purchases, /profile
+    // Admin & auth navigations — never cache.
+    // These pages carry session-sensitive data, QR scanning, and write
+    // operations that must always hit the network.
+    {
+      urlPattern: ({ request, url }: { request: Request; url: URL }) =>
+        request.mode === "navigate" &&
+        (/^\/admin(\/|$)/.test(url.pathname) || /^\/auth(\/|$)/.test(url.pathname)),
+      handler: "NetworkOnly",
+    },
+
+    // Customer-facing page navigations — network-first with 3 s timeout, 4 h cache.
+    // Covers /, /menu, /about, /dashboard, /purchases, /profile, /offline.
+    // 4 h keeps pages available offline for a typical visit while ensuring
+    // CMS or menu changes propagate within the same business day.
     {
       urlPattern: ({ request }: { request: Request }) => request.mode === "navigate",
       handler: "NetworkFirst",
       options: {
         cacheName: "pages",
         networkTimeoutSeconds: 3,
-        expiration: { maxEntries: 32, maxAgeSeconds: 24 * 60 * 60 },
+        expiration: { maxEntries: 32, maxAgeSeconds: 4 * 60 * 60 },
         cacheableResponse: { statuses: [0, 200] },
       },
     },

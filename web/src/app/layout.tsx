@@ -2,6 +2,8 @@ import type { Metadata, Viewport } from "next";
 import { Playfair_Display, Lato, Dancing_Script } from "next/font/google";
 import { Providers } from "./providers";
 import InstallPrompt from "@/components/ui/InstallPrompt";
+import OfflineDetector from "@/components/ui/OfflineDetector";
+import SwUpdateBanner from "@/components/ui/SwUpdateBanner";
 import LangPickerModal from "@/components/ui/LangPickerModal";
 import GearGuidance from "@/components/ui/GearGuidance";
 import "./globals.css";
@@ -65,6 +67,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <GearGuidance />
         </Providers>
         <InstallPrompt />
+        <OfflineDetector />
+        <SwUpdateBanner />
       </body>
     </html>
   );
