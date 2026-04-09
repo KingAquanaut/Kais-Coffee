@@ -227,7 +227,16 @@ export default function PublicNav({ overlayHero = false }: PublicNavProps) {
       }}
     >
       {/* Left: brand logo */}
-      <Link href="/" style={{ display: "flex", alignItems: "center", flexShrink: 0 }}>
+      <Link
+        href="/"
+        className={ghost ? "kc-logo-iridescent" : undefined}
+        style={{
+          display: "flex", alignItems: "center", flexShrink: 0,
+          borderRadius: ghost ? "0.5rem" : undefined,
+          padding: ghost ? "0.2rem 0.5rem" : undefined,
+          boxShadow: ghost ? "0 2px 12px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.4)" : undefined,
+        }}
+      >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/logo.png"
@@ -236,10 +245,8 @@ export default function PublicNav({ overlayHero = false }: PublicNavProps) {
             height: 40,
             width: "auto",
             transition: "opacity 0.35s ease",
-            background: ghost ? "rgba(255,255,255,0.75)" : undefined,
-            borderRadius: ghost ? "0.5rem" : undefined,
-            padding: ghost ? "0.2rem 0.5rem" : undefined,
-            boxShadow: ghost ? "0 1px 8px rgba(0,0,0,0.15)" : undefined,
+            position: "relative",
+            zIndex: 1,
           }}
         />
       </Link>
