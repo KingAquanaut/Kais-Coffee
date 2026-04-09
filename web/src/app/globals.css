@@ -32,19 +32,25 @@
 *, *::before, *::after { box-sizing: border-box; }
 
 html {
-  /* Background handled by a position:fixed div in layout.tsx — avoids
-     scroll-triggered full-page repaints from background-attachment:fixed */
-  background-color: #f5f9fc;
+  /* Primary background: position:fixed div in layout.tsx (avoids
+     scroll-triggered repaints from background-attachment:fixed).
+     Fallback: same watercolor painted on the root canvas so iOS
+     rubber-band overscroll shows the texture instead of flat white. */
+  background: #f5f9fc url("/watercolor-bg.svg") center top / cover no-repeat;
   color:            var(--kc-black);
   font-family:      var(--font-body);
   -webkit-font-smoothing: antialiased;
 }
 
 body {
-  min-height: 100svh;
+  min-height: 100dvh;
   /* Transparent so the html watercolor shows through page wrappers that
      use --kc-bg (now rgba 82 % opaque), creating a consistent soft texture */
   background: transparent;
+  /* Prevent overscroll bounce on browsers that support it (Chrome, Edge,
+     Firefox).  iOS Safari ignores this — the html canvas background above
+     handles that case instead. */
+  overscroll-behavior-y: none;
 }
 
 h1, h2, h3, h4 {

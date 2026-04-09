@@ -29,7 +29,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   if (loading) {
     return (
-      <div className="flex min-h-svh items-center justify-center">
+      <div className="flex min-h-dvh items-center justify-center">
         <LoadingSpinner />
       </div>
     );
@@ -40,7 +40,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const handleLogout = async () => { await logout(); router.push("/"); };
 
   return (
-    <div className="flex min-h-svh">
+    <div className="flex min-h-dvh">
       {/* Sidebar */}
       <aside
         className="hidden md:flex flex-col w-56 flex-shrink-0 sticky top-0 h-screen"

@@ -25,7 +25,7 @@ export default function LoginPage() {
   // Show spinner while the AuthContext is rehydrating from localStorage
   if (loading) {
     return (
-      <div className="flex min-h-svh items-center justify-center" style={{ background: "transparent" }}>
+      <div className="flex min-h-dvh items-center justify-center" style={{ background: "transparent" }}>
         <LoadingSpinner />
       </div>
     );
@@ -52,7 +52,7 @@ export default function LoginPage() {
   const fillAdmin = () => { setEmail("admin@kaiscoffee.com"); setPassword("password"); };
 
   return (
-    <div className="flex min-h-svh items-center justify-center px-4" style={{ background: "transparent" }}>
+    <div className="flex min-h-dvh items-center justify-center px-4" style={{ background: "transparent" }}>
       <div className="kc-card w-full max-w-md px-5 sm:px-8 py-8 sm:py-10">
 
         <Link href="/" className="text-sm block mb-6" style={{ color: "var(--kc-muted)" }}>

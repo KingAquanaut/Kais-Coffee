@@ -18,7 +18,7 @@ export default async function AboutPage() {
   } catch { /* AboutPageContent falls back to hardcoded defaults */ }
 
   return (
-    <div style={{ minHeight: "100svh" }}>
+    <div style={{ minHeight: "100dvh" }}>
       <PublicNav />
       <AboutPageContent content={content} />
     </div>

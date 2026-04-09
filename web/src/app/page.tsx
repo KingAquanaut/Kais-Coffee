@@ -31,13 +31,13 @@ export default async function HomePage() {
   const hasPhoto = Boolean(heroImageUrl);
 
   return (
-    <div style={{ minHeight: "100svh" }}>
+    <div style={{ minHeight: "100dvh" }}>
       <PublicNav overlayHero />
 
       {/* ── Hero ──────────────────────────────────────────────────────────── */}
       <div
         className={`relative flex flex-col items-center text-center px-6 ${hasPhoto ? "justify-end" : "justify-center"}`}
-        style={{ minHeight: "100svh", overflow: "hidden", paddingBottom: hasPhoto ? "5.5rem" : undefined }}
+        style={{ minHeight: "100dvh", overflow: "hidden", paddingBottom: hasPhoto ? "5.5rem" : undefined }}
       >
         {/* Background */}
         {hasPhoto ? (

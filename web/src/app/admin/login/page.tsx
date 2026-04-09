@@ -34,7 +34,7 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div className="flex min-h-svh items-center justify-center px-4" style={{ background: "transparent" }}>
+    <div className="flex min-h-dvh items-center justify-center px-4" style={{ background: "transparent" }}>
       <div className="kc-card w-full max-w-sm px-8 py-10">
         <p className="text-xs mb-6 tracking-widest uppercase" style={{ color: "var(--kc-muted)" }}>
           Kai&apos;s Coffee

@@ -19,7 +19,7 @@ export default function AppLayout({ children, adminOnly = false }: Props) {
 
   if (loading) {
     return (
-      <div className="flex min-h-svh items-center justify-center" style={{ background: "transparent" }}>
+      <div className="flex min-h-dvh items-center justify-center" style={{ background: "transparent" }}>
         <LoadingSpinner text="Loading…" />
       </div>
     );
@@ -28,7 +28,7 @@ export default function AppLayout({ children, adminOnly = false }: Props) {
   if (!user || (adminOnly && !user.is_admin)) return null;
 
   return (
-    <div style={{ background: "transparent", minHeight: "100svh" }}>
+    <div style={{ background: "transparent", minHeight: "100dvh" }}>
       <AppNav />
       <main className="max-w-2xl mx-auto px-4 pt-6 pb-28 sm:pb-10">
         {children}

@@ -16,7 +16,7 @@ export default async function MenuPage() {
   } catch { /* render with empty categories */ }
 
   return (
-    <div style={{ minHeight: "100svh" }}>
+    <div style={{ minHeight: "100dvh" }}>
       <PublicNav />
 
       {/* ── Logo ─────────────────────────────────────────────────────────────── */}
