@@ -6,6 +6,13 @@ import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import { admin as adminApi, revalidate, type MenuCategory, type MenuItem } from "@/lib/api";
 import { getToken } from "@/contexts/AuthContext";
 
+type CatForm = {
+  name: string;
+  name_es: string;
+  description: string;
+  description_es: string;
+};
+
 type ItemForm = {
   name: string;
   name_es: string;
@@ -32,6 +39,12 @@ export default function AdminMenuPage() {
   const [saving,  setSaving]  = useState(false);
   const [formErr, setFormErr] = useState<string | null>(null);
   const [msg,     setMsg]     = useState<string | null>(null);
+
+  // Category editing state
+  const [editingCatId,  setEditingCatId]  = useState<number | null>(null);
+  const [catForm,       setCatForm]       = useState<CatForm>({ name: "", name_es: "", description: "", description_es: "" });
+  const [catSaving,     setCatSaving]     = useState(false);
+  const [catErr,        setCatErr]        = useState<string | null>(null);
 
   // Image upload state
   const [imageFile,        setImageFile]        = useState<File | null>(null);
@@ -174,6 +187,45 @@ export default function AdminMenuPage() {
     }
   };
 
+  const openCatEdit = (cat: MenuCategory) => {
+    setEditingCatId(cat.id);
+    setCatForm({
+      name: cat.name,
+      name_es: cat.name_es ?? "",
+      description: cat.description ?? "",
+      description_es: cat.description_es ?? "",
+    });
+    setCatErr(null);
+  };
+
+  const closeCatEdit = () => {
+    setEditingCatId(null);
+    setCatErr(null);
+  };
+
+  const handleCatSave = async () => {
+    if (!token || !editingCatId) return;
+    if (!catForm.name.trim()) { setCatErr("Name is required."); return; }
+    setCatSaving(true);
+    setCatErr(null);
+    try {
+      await adminApi.menu.updateCategory(token, editingCatId, {
+        name: catForm.name,
+        name_es: catForm.name_es || null,
+        description: catForm.description || null,
+        description_es: catForm.description_es || null,
+      } as Partial<MenuCategory>);
+      closeCatEdit();
+      setMsg("Category updated.");
+      await revalidate(["/menu", "/"]);
+      load();
+    } catch (err: unknown) {
+      setCatErr(err instanceof Error ? err.message : "Could not save category.");
+    } finally {
+      setCatSaving(false);
+    }
+  };
+
   const filteredItems = activeCat ? items.filter(i => i.menu_category_id === activeCat) : items;
 
   // Determine the image to preview in the modal
@@ -198,7 +250,24 @@ export default function AdminMenuPage() {
         </div>
       )}
 
-      {/* Category tabs */}
+      {/* ── Category section ──────────────────────────────────────────────── */}
+      <div className="mb-8">
+        <h2 className="text-lg font-bold mb-3" style={{ fontFamily: "var(--font-heading)" }}>Categories</h2>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+          {categories.map(cat => (
+            <div key={cat.id} className="kc-card p-4 flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-bold text-sm truncate">{cat.name}</p>
+                {cat.name_es && <p className="text-xs truncate" style={{ color: "var(--kc-gold)" }}>{cat.name_es}</p>}
+                {cat.description && <p className="text-xs truncate mt-0.5" style={{ color: "var(--kc-muted)" }}>{cat.description}</p>}
+              </div>
+              <button onClick={() => openCatEdit(cat)} className="kc-btn kc-btn-sm kc-btn-outline shrink-0">Edit</button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Category filter tabs */}
       <div className="flex gap-2 flex-wrap mb-6">
         <button
           onClick={() => setActiveCat(null)}
@@ -490,6 +559,80 @@ export default function AdminMenuPage() {
               <button onClick={closeModal} className="kc-btn kc-btn-outline flex-1">Cancel</button>
               <button onClick={handleSave} disabled={saving} className="kc-btn flex-1">
                 {saving ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* ── Category edit modal ───────────────────────────────────────────── */}
+      {editingCatId !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: "rgba(26,26,26,0.5)" }}
+          onClick={e => { if (e.target === e.currentTarget) closeCatEdit(); }}
+        >
+          <div className="kc-card w-full max-w-md flex flex-col" style={{ maxHeight: "90svh" }}>
+            <div className="p-6 pb-3">
+              <h2 className="text-xl font-bold" style={{ fontFamily: "var(--font-heading)" }}>Edit Category</h2>
+            </div>
+
+            <div className="px-6 pb-2 overflow-y-auto flex-1">
+              {catErr && <p className="text-xs mb-3" style={{ color: "var(--kc-error)" }}>{catErr}</p>}
+
+              <div className="flex flex-col gap-4">
+                <div>
+                  <label className="kc-label">Name</label>
+                  <input
+                    type="text"
+                    value={catForm.name}
+                    onChange={e => setCatForm(f => ({ ...f, name: e.target.value }))}
+                    className="kc-input"
+                    required
+                  />
+                </div>
+
+                <div style={{ borderLeft: "3px solid #e8a838", paddingLeft: "0.75rem" }}>
+                  <label className="kc-label" style={{ color: "#b8962e" }}>
+                    Nombre en Español <span style={{ fontWeight: 400, opacity: 0.7 }}>(Spanish Name)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={catForm.name_es}
+                    onChange={e => setCatForm(f => ({ ...f, name_es: e.target.value }))}
+                    className="kc-input"
+                    placeholder="Leave blank to use English name"
+                  />
+                </div>
+
+                <div>
+                  <label className="kc-label">Description</label>
+                  <textarea
+                    value={catForm.description}
+                    onChange={e => setCatForm(f => ({ ...f, description: e.target.value }))}
+                    className="kc-input"
+                    style={{ height: "4.5rem", resize: "vertical" }}
+                  />
+                </div>
+
+                <div style={{ borderLeft: "3px solid #e8a838", paddingLeft: "0.75rem" }}>
+                  <label className="kc-label" style={{ color: "#b8962e" }}>
+                    Descripción en Español <span style={{ fontWeight: 400, opacity: 0.7 }}>(Spanish Description)</span>
+                  </label>
+                  <textarea
+                    value={catForm.description_es}
+                    onChange={e => setCatForm(f => ({ ...f, description_es: e.target.value }))}
+                    className="kc-input"
+                    placeholder="Leave blank to use English description"
+                    style={{ height: "4.5rem", resize: "vertical" }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 p-6 pt-4" style={{ borderTop: "1px solid var(--kc-cream-dark)" }}>
+              <button onClick={closeCatEdit} className="kc-btn kc-btn-outline flex-1">Cancel</button>
+              <button onClick={handleCatSave} disabled={catSaving} className="kc-btn flex-1">
+                {catSaving ? "Saving…" : "Save"}
               </button>
             </div>
           </div>

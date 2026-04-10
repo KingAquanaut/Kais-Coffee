@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\ValidationException;
 
@@ -92,7 +93,13 @@ class AuthController extends Controller
     {
         $request->validate(['email' => ['required', 'email']]);
 
-        Password::sendResetLink($request->only('email'));
+        $status = Password::sendResetLink($request->only('email'));
+
+        // Log the broker result for debugging — never expose publicly.
+        Log::info('password.reset_link', [
+            'status' => $status,
+            'mailer' => config('mail.default'),
+        ]);
 
         // Always return 200 with a generic message to avoid email enumeration
         return response()->json([

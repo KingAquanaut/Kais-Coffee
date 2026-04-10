@@ -20,11 +20,13 @@ class MenuCategoryController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'name'        => ['required', 'string', 'max:100'],
-            'description' => ['nullable', 'string'],
-            'image_url'   => ['nullable', 'url'],
-            'sort_order'  => ['nullable', 'integer'],
-            'is_active'   => ['nullable', 'boolean'],
+            'name'           => ['required', 'string', 'max:100'],
+            'name_es'        => ['nullable', 'string', 'max:100'],
+            'description'    => ['nullable', 'string'],
+            'description_es' => ['nullable', 'string'],
+            'image_url'      => ['nullable', 'url'],
+            'sort_order'     => ['nullable', 'integer'],
+            'is_active'      => ['nullable', 'boolean'],
         ]);
 
         $data['slug'] = Str::slug($data['name']);
@@ -40,11 +42,13 @@ class MenuCategoryController extends Controller
     public function update(Request $request, MenuCategory $menuCategory): JsonResponse
     {
         $data = $request->validate([
-            'name'        => ['sometimes', 'string', 'max:100'],
-            'description' => ['nullable', 'string'],
-            'image_url'   => ['nullable', 'url'],
-            'sort_order'  => ['nullable', 'integer'],
-            'is_active'   => ['nullable', 'boolean'],
+            'name'           => ['sometimes', 'string', 'max:100'],
+            'name_es'        => ['nullable', 'string', 'max:100'],
+            'description'    => ['nullable', 'string'],
+            'description_es' => ['nullable', 'string'],
+            'image_url'      => ['nullable', 'url'],
+            'sort_order'     => ['nullable', 'integer'],
+            'is_active'      => ['nullable', 'boolean'],
         ]);
 
         if (isset($data['name'])) {

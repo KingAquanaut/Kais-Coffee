@@ -2,13 +2,14 @@
 
 namespace App\Models;
 
+use App\Mail\ResetPasswordMail;
 use Database\Factories\UserFactory;
-use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\Mail;
 use Laravel\Sanctum\HasApiTokens;
 
 class User extends Authenticatable
@@ -58,12 +59,13 @@ class User extends Authenticatable
      */
     public function sendPasswordResetNotification($token): void
     {
-        $frontendUrl = config('app.frontend_url');
+        $url = config('app.frontend_url')
+            . '/auth/reset-password?token=' . $token
+            . '&email=' . urlencode($this->email);
 
-        ResetPassword::createUrlUsing(function (User $user, string $token) use ($frontendUrl) {
-            return $frontendUrl . '/auth/reset-password?token=' . $token . '&email=' . urlencode($user->email);
-        });
-
-        $this->notify(new ResetPassword($token));
+        Mail::to($this->email)->send(new ResetPasswordMail(
+            resetUrl: $url,
+            userName: $this->name,
+        ));
     }
 }
