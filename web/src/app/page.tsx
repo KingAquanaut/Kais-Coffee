@@ -1,5 +1,5 @@
 import PublicNav from "@/components/layout/PublicNav";
-import { HeroBadge, HeroButtons, HeroText, SeasonalSection, StampSection, PillarsSection, HomeFooter } from "./HomeContent";
+import { HeroBadge, HeroButtons, HeroText, SeasonalSection, StampSection, PillarsSection, HomeFooter, type PillarCms } from "./HomeContent";
 import { optimized } from "@/lib/cloudinary";
 import type { PageContent, MenuItem } from "@/lib/api";
 
@@ -14,6 +14,7 @@ export default async function HomePage() {
   let cmsHeading:    string | null = null;
   let cmsSubtext:    string | null = null;
   let seasonalItems: MenuItem[] = [];
+  let cmsPillars: [PillarCms, PillarCms, PillarCms] | undefined;
   try {
     const [cmsRes, seasonalRes] = await Promise.all([
       fetch(`${BASE}/page-contents/home`, { next: { revalidate: 300 }, headers: { Accept: "application/json" } }),
@@ -24,6 +25,18 @@ export default async function HomePage() {
       heroImageUrl = (data.hero_image_url as string | null) || null;
       cmsHeading   = (data.hero_heading   as string | null) || null;
       cmsSubtext   = (data.hero_subtext   as string | null) || null;
+
+      // Extract pillar CMS overrides (if any were saved by admin)
+      const p = (n: number): PillarCms => ({
+        title:    data[`pillar_${n}_title`]    || null,
+        body:     data[`pillar_${n}_body`]     || null,
+        title_es: data[`pillar_${n}_title_es`] || null,
+        body_es:  data[`pillar_${n}_body_es`]  || null,
+      });
+      const p1 = p(1), p2 = p(2), p3 = p(3);
+      if (p1.title || p2.title || p3.title) {
+        cmsPillars = [p1, p2, p3];
+      }
     }
     if (seasonalRes.ok) seasonalItems = await seasonalRes.json();
   } catch { /* render with nulls → client uses translation fallbacks */ }
@@ -96,7 +109,7 @@ export default async function HomePage() {
 
       {/* ── Stamp card + pillars + footer — all translated client components ── */}
       <StampSection />
-      <PillarsSection />
+      <PillarsSection cms={cmsPillars} />
       <HomeFooter />
     </div>
   );

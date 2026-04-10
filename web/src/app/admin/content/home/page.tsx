@@ -10,6 +10,19 @@ const DEFAULTS = {
   hero_heading:   "Every cup, a small pleasure.",
   hero_subtext:   "Single-origin espresso, slow-steeped cold brews, and house-baked pastries — crafted with care, for you.",
   hero_image_url: "",
+  // Pillars
+  pillar_1_title:    "Espresso Bar",
+  pillar_1_body:     "Single-origin beans pulled at 9 bar. Notes of dark chocolate and hazelnut.",
+  pillar_1_title_es: "",
+  pillar_1_body_es:  "",
+  pillar_2_title:    "Cold Brew",
+  pillar_2_body:     "18-hour cold steep. Nitrogen on tap. Smooth, never bitter.",
+  pillar_2_title_es: "",
+  pillar_2_body_es:  "",
+  pillar_3_title:    "House Pastries",
+  pillar_3_body:     "Almond croissants, banana bread, seasonal scones. Baked fresh daily.",
+  pillar_3_title_es: "",
+  pillar_3_body_es:  "",
 };
 
 type Form = typeof DEFAULTS;
@@ -283,6 +296,56 @@ export default function AdminHomePage() {
             placeholder="Single-origin espresso, slow-steeped cold brews…"
           />
         </Field>
+      </SectionCard>
+
+      {/* ── Pillars (3 cards below hero) ─────────────────────────────── */}
+      <SectionCard title="Three Pillars (below hero)">
+        <p className="text-xs" style={{ color: "var(--kc-muted)", marginTop: "-0.25rem" }}>
+          The three feature cards shown beneath the stamp section on the home page.
+        </p>
+        {([1, 2, 3] as const).map(n => (
+          <div key={n} style={{ paddingTop: "0.75rem", borderTop: "1px solid var(--kc-cream-dark)" }}>
+            <p className="text-xs font-bold mb-3" style={{ color: "var(--kc-muted)" }}>Pillar {n}</p>
+            <div className="grid sm:grid-cols-2 gap-3">
+              <Field label="Title">
+                <input
+                  type="text"
+                  value={form[`pillar_${n}_title`]}
+                  onChange={e => set(`pillar_${n}_title`, e.target.value)}
+                  className="kc-input"
+                />
+              </Field>
+              <Field label="Body">
+                <textarea
+                  value={form[`pillar_${n}_body`]}
+                  onChange={e => set(`pillar_${n}_body`, e.target.value)}
+                  className="kc-input"
+                  style={{ height: "4.5rem", resize: "vertical" }}
+                />
+              </Field>
+              <div style={{ borderLeft: "3px solid #e8a838", paddingLeft: "0.75rem" }}>
+                <label className="kc-label" style={{ color: "#b8962e" }}>Título <span style={{ fontWeight: 400, opacity: 0.7 }}>(Spanish)</span></label>
+                <input
+                  type="text"
+                  value={form[`pillar_${n}_title_es`]}
+                  onChange={e => set(`pillar_${n}_title_es`, e.target.value)}
+                  className="kc-input"
+                  placeholder="Leave blank to use English"
+                />
+              </div>
+              <div style={{ borderLeft: "3px solid #e8a838", paddingLeft: "0.75rem" }}>
+                <label className="kc-label" style={{ color: "#b8962e" }}>Cuerpo <span style={{ fontWeight: 400, opacity: 0.7 }}>(Spanish)</span></label>
+                <textarea
+                  value={form[`pillar_${n}_body_es`]}
+                  onChange={e => set(`pillar_${n}_body_es`, e.target.value)}
+                  className="kc-input"
+                  style={{ height: "4.5rem", resize: "vertical" }}
+                  placeholder="Leave blank to use English"
+                />
+              </div>
+            </div>
+          </div>
+        ))}
       </SectionCard>
 
       {/* Sticky bottom save bar */}

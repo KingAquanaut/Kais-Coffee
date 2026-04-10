@@ -292,14 +292,26 @@ export function StampSection() {
 }
 
 // ── Three pillars section ─────────────────────────────────────────────────────
-export function PillarsSection() {
-  const { strings } = useLang();
+export type PillarCms = { title?: string | null; body?: string | null; title_es?: string | null; body_es?: string | null };
+type PillarsProps = { cms?: [PillarCms, PillarCms, PillarCms] };
+
+export function PillarsSection({ cms }: PillarsProps) {
+  const { lang, strings } = useLang();
   const s = strings.home;
-  const pillars = [
+  const fallbacks = [
     { title: s.espressoBar, body: s.espressoBody },
     { title: s.coldBrew,    body: s.coldBrewBody },
     { title: s.pastries,    body: s.pastriesBody },
   ];
+  const pillars = fallbacks.map((fb, i) => {
+    const c = cms?.[i];
+    if (!c?.title) return fb; // no CMS override for this pillar
+    const isEs = lang === "es";
+    return {
+      title: (isEs && c.title_es) || c.title || fb.title,
+      body:  (isEs && c.body_es)  || c.body  || fb.body,
+    };
+  });
   return (
     <section className="px-6 pb-24">
       <div className="max-w-3xl mx-auto">
