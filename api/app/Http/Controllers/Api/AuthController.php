@@ -8,6 +8,7 @@ use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -85,5 +86,42 @@ class AuthController extends Controller
         $request->user()->update($data);
 
         return response()->json($request->user()->fresh()->load('rewardAccount'));
+    }
+
+    public function forgotPassword(Request $request): JsonResponse
+    {
+        $request->validate(['email' => ['required', 'email']]);
+
+        Password::sendResetLink($request->only('email'));
+
+        // Always return 200 with a generic message to avoid email enumeration
+        return response()->json([
+            'message' => 'If an account exists with that email, a reset link has been sent.',
+        ]);
+    }
+
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $request->validate([
+            'token'    => ['required'],
+            'email'    => ['required', 'email'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $status = Password::reset(
+            $request->only('email', 'password', 'password_confirmation', 'token'),
+            function (User $user, string $password) {
+                $user->update(['password' => Hash::make($password)]);
+                $user->tokens()->delete(); // revoke existing sessions
+            }
+        );
+
+        if ($status !== Password::PASSWORD_RESET) {
+            throw ValidationException::withMessages([
+                'email' => [__($status)],
+            ]);
+        }
+
+        return response()->json(['message' => 'Password has been reset successfully.']);
     }
 }

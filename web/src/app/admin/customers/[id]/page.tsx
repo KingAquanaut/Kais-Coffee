@@ -7,6 +7,7 @@ import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import PointsCard from "@/components/ui/PointsCard";
 import { admin as adminApi, type User, type Purchase, type RewardSummary, type ApiError } from "@/lib/api";
 import { getToken } from "@/contexts/AuthContext";
+import { PURCHASES_ENABLED } from "@/lib/features";
 import { LANGUAGES, type LangCode } from "@/i18n/translations";
 
 // ── Toast ────────────────────────────────────────────────────────────────────
@@ -413,7 +414,7 @@ export default function AdminCustomerDetailPage() {
           />
         )}
 
-        <RecentPurchases purchases={purchases} />
+        {PURCHASES_ENABLED && <RecentPurchases purchases={purchases} />}
       </div>
     </AdminLayout>
   );

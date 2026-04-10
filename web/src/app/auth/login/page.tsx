@@ -108,7 +108,13 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm" style={{ color: "var(--kc-muted)" }}>
+        <p className="mt-4 text-center text-sm">
+          <Link href="/auth/forgot-password" style={{ color: "var(--kc-blue-deep)", fontWeight: 600 }}>
+            Forgot password?
+          </Link>
+        </p>
+
+        <p className="mt-3 text-center text-sm" style={{ color: "var(--kc-muted)" }}>
           No account?{" "}
           <Link href="/auth/register" style={{ color: "var(--kc-blue-deep)", fontWeight: 700 }}>
             Create one

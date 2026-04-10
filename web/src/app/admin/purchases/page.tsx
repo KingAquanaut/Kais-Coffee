@@ -1,12 +1,15 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import AdminLayout from "@/components/layout/AdminLayout";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import { admin as adminApi, type Purchase, type Paginated } from "@/lib/api";
 import { getToken } from "@/contexts/AuthContext";
+import { PURCHASES_ENABLED } from "@/lib/features";
 
 export default function AdminPurchasesPage() {
+  if (!PURCHASES_ENABLED) redirect("/admin");
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [meta,      setMeta]      = useState<{ current_page: number; last_page: number } | null>(null);
   const [loading,   setLoading]   = useState(true);
@@ -31,14 +34,20 @@ export default function AdminPurchasesPage() {
 
   useEffect(() => { load(page); }, [page]);
 
+  const [msg, setMsg] = useState<string | null>(null);
+
   const handleVoid = async (id: number) => {
     const token = getToken();
     if (!token || !confirm("Void this purchase? Points will be reversed.")) return;
     setVoidingId(id);
+    setError(null);
     try {
       await adminApi.purchases.void(token, id);
+      setMsg("Purchase voided and points reversed.");
       load(page);
-    } catch { /* ignore */ } finally {
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Could not void purchase.");
+    } finally {
       setVoidingId(null);
     }
   };
@@ -53,8 +62,17 @@ export default function AdminPurchasesPage() {
         <Link href="/admin/purchases/record" className="kc-btn">Record New</Link>
       </div>
 
+      {msg && (
+        <div
+          className="mb-5 py-3 px-4 rounded-xl text-sm cursor-pointer"
+          style={{ background: "#d1fae5", color: "var(--kc-success)" }}
+          onClick={() => setMsg(null)}
+        >
+          {msg}
+        </div>
+      )}
       {error && (
-        <div className="mb-5 py-3 px-4 rounded-xl text-sm" style={{ background: "#fee2e2", color: "var(--kc-error)" }}>
+        <div className="mb-5 py-3 px-4 rounded-xl text-sm cursor-pointer" style={{ background: "#fee2e2", color: "var(--kc-error)" }} onClick={() => setError(null)}>
           {error}
         </div>
       )}

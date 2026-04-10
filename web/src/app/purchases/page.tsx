@@ -1,11 +1,13 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import AppLayout from "@/components/layout/AppLayout";
 import PurchaseRow from "@/components/ui/PurchaseRow";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import { account as accountApi, type Purchase, type Paginated } from "@/lib/api";
 import { getToken } from "@/contexts/AuthContext";
+import { PURCHASES_ENABLED } from "@/lib/features";
 
 // ── Empty state ───────────────────────────────────────────────────────────────
 function EmptyState() {
@@ -27,6 +29,8 @@ function EmptyState() {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function PurchasesPage() {
+  if (!PURCHASES_ENABLED) redirect("/dashboard");
+
   const [purchases, setPurchases] = useState<Purchase[]>([]);
   const [meta, setMeta] = useState<{
     current_page: number;

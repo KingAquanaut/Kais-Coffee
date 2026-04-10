@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import AdminLayout from "@/components/layout/AdminLayout";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
-import { admin as adminApi, ApiError } from "@/lib/api";
+import { admin as adminApi, ApiError, revalidate } from "@/lib/api";
 import { getToken } from "@/contexts/AuthContext";
 
 // ── Defaults ──────────────────────────────────────────────────────────────
@@ -67,7 +67,7 @@ export default function AdminHomePage() {
         }
         setForm(merged);
       })
-      .catch(() => {})
+      .catch(() => setErr("Could not load page content."))
       .finally(() => setLoading(false));
   }, [token]);
 
@@ -90,6 +90,7 @@ export default function AdminHomePage() {
       const { hero_image_url, ...textFields } = form;
       void hero_image_url; // managed via uploadImage
       await adminApi.pageContent.update(token, "home", textFields);
+      await revalidate(["/"]);
       setMsg("Home page content saved.");
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : "Could not save.");
@@ -115,6 +116,7 @@ export default function AdminHomePage() {
         if (fileInputRef.current) fileInputRef.current.value = "";
         setImageMsg("Hero image updated.");
       }
+      await revalidate(["/"]);
     } catch (e: unknown) {
       if (e instanceof ApiError && e.errors?.image) {
         setImageErr(e.errors.image[0]);
@@ -289,7 +291,7 @@ export default function AdminHomePage() {
         style={{ background: "var(--kc-cream)", border: "1.5px solid var(--kc-border)", marginTop: "0.5rem" }}
       >
         <p className="text-xs" style={{ color: "var(--kc-muted)" }}>
-          Changes apply to the public home page immediately after saving.
+          Saves update the public home page within a few seconds.
         </p>
         <button onClick={handleSave} disabled={saving} className="kc-btn">
           {saving ? "Saving…" : "Save All"}

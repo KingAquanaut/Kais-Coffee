@@ -56,6 +56,34 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Frontend URL
+    |--------------------------------------------------------------------------
+    |
+    | The base URL of the Next.js frontend.  Used for password-reset links
+    | and any other backend-generated URLs that point to the SPA.
+    | When FRONTEND_URL contains multiple comma-separated origins (for CORS),
+    | only the first value is used here.
+    |
+    */
+
+    'frontend_url' => explode(',', env('FRONTEND_URL', 'http://localhost:3000'))[0],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Feature Flags
+    |--------------------------------------------------------------------------
+    |
+    | Toggle feature sets on/off for phased rollouts.  Each flag maps to an
+    | env var so it can be flipped per environment without code changes.
+    |
+    */
+
+    'features' => [
+        'purchases_enabled' => env('PURCHASES_ENABLED', false),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

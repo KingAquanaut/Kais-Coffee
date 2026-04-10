@@ -10,11 +10,11 @@ export type User = {
 };
 export type RewardAccount = { id: number; user_id: number; points_balance: number; lifetime_points: number; };
 export type MenuCategory = {
-  id: number; name: string; name_es: string | null; slug: string; description: string | null; image_url: string | null;
+  id: number; name: string; name_es: string | null; slug: string; description: string | null; description_es: string | null; image_url: string | null;
   sort_order: number; is_active: boolean; active_items?: MenuItem[];
 };
 export type MenuItem = {
-  id: number; menu_category_id: number; name: string; name_es: string | null; slug: string; description: string | null;
+  id: number; menu_category_id: number; name: string; name_es: string | null; slug: string; description: string | null; description_es: string | null;
   price: string; image_url: string | null; is_active: boolean; is_featured: boolean; is_seasonal: boolean; sort_order: number;
   category?: { id: number; name: string; slug: string };
 };
@@ -27,15 +27,17 @@ export type Purchase = {
 export type DashboardData = {
   user: User; points_balance: number; lifetime_points: number; points_threshold: number;
   points_to_next: number; can_redeem: boolean; recent_purchases: Purchase[];
+  purchases_enabled?: boolean;
 };
 export type AdminStats = {
-  stats: { total_users: number; total_purchases: number; month_revenue: string; active_items: number; };
+  stats: { total_users: number; total_purchases?: number; month_revenue?: string; active_items: number; };
   recent_purchases: Purchase[];
   top_items: { name: string; qty_sold: number }[];
+  purchases_enabled?: boolean;
 };
 export type Paginated<T> = { data: T[]; current_page: number; last_page: number; per_page: number; total: number; };
 export type RewardSummary = { points_balance: number; lifetime_points: number; threshold: number; can_redeem: boolean; };
-export type UserDetail = { user: User & { purchases?: Purchase[] }; reward_summary: RewardSummary; };
+export type UserDetail = { user: User & { purchases?: Purchase[] }; reward_summary: RewardSummary; purchases_enabled?: boolean; };
 export type QrTokenResponse = { token: string; expires_at: string; ttl: number; };
 export type ScanRedeemResponse = { message: string; customer: { id: number; name: string }; points_balance: number; lifetime_points: number; can_redeem: boolean; };
 export type ScanStampResponse = { message: string; customer: { id: number; name: string }; points_balance: number; lifetime_points: number; can_redeem: boolean; };
@@ -59,6 +61,17 @@ async function req<T>(path: string, opts: { method?: string; body?: unknown; tok
   return res.json() as Promise<T>;
 }
 
+// ── ISR revalidation (called after admin saves) ──────────────────────────
+export async function revalidate(paths: string[]): Promise<void> {
+  try {
+    await fetch("/api/revalidate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ paths }),
+    });
+  } catch { /* best-effort — page will revalidate naturally within 5 min */ }
+}
+
 // ── File upload (multipart/form-data) ──────────────────────────────────────
 async function upload<T>(path: string, formData: FormData, token: string): Promise<T> {
   const headers: Record<string, string> = { Accept: "application/json", Authorization: `Bearer ${token}` };
@@ -80,6 +93,10 @@ export const auth = {
   me: (token: string) => req<User>("/auth/me", { token }),
   updateProfile: (token: string, body: { name?: string; phone?: string | null }) =>
     req<User>("/auth/me", { method: "PUT", body, token }),
+  forgotPassword: (body: { email: string }) =>
+    req<{ message: string }>("/auth/forgot-password", { method: "POST", body }),
+  resetPassword: (body: { token: string; email: string; password: string; password_confirmation: string }) =>
+    req<{ message: string }>("/auth/reset-password", { method: "POST", body }),
 };
 
 // ── Public Page Content ────────────────────────────────────────────────────

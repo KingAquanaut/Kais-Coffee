@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Database\Factories\UserFactory;
+use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -50,5 +51,19 @@ class User extends Authenticatable
     public function staffPurchases(): HasMany
     {
         return $this->hasMany(Purchase::class, 'staff_id');
+    }
+
+    /**
+     * Send the password reset notification with a link to the frontend app.
+     */
+    public function sendPasswordResetNotification($token): void
+    {
+        $frontendUrl = config('app.frontend_url');
+
+        ResetPassword::createUrlUsing(function (User $user, string $token) use ($frontendUrl) {
+            return $frontendUrl . '/auth/reset-password?token=' . $token . '&email=' . urlencode($user->email);
+        });
+
+        $this->notify(new ResetPassword($token));
     }
 }

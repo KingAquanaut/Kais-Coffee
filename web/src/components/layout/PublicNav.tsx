@@ -6,6 +6,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LangContext";
 import SettingsMenu from "@/components/ui/SettingsMenu";
 import type { User } from "@/lib/api";
+import { PURCHASES_ENABLED } from "@/lib/features";
 
 // ── Chevron icon ──────────────────────────────────────────────────────────────
 function Chevron({ open, ghost }: { open: boolean; ghost?: boolean }) {
@@ -70,7 +71,7 @@ function UserMenu({
     ? [{ href: "/admin",     label: strings.nav.adminDashboard }]
     : [
         { href: "/dashboard", label: strings.nav.myRewards },
-        { href: "/purchases", label: strings.nav.purchaseHistory },
+        ...(PURCHASES_ENABLED ? [{ href: "/purchases", label: strings.nav.purchaseHistory }] : []),
         { href: "/profile",   label: strings.nav.accountSettings },
       ];
 

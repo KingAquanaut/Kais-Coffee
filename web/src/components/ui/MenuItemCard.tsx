@@ -1,4 +1,5 @@
 import ItemImage from "./ItemImage";
+import { useLang } from "@/contexts/LangContext";
 import type { MenuItem } from "@/lib/api";
 
 type Props = {
@@ -8,6 +9,9 @@ type Props = {
 };
 
 export default function MenuItemCard({ item, compact = false, action }: Props) {
+  const { lang } = useLang();
+  const displayName = (lang === "es" && item.name_es) ? item.name_es : item.name;
+  const displayDescription = (lang === "es" && item.description_es) ? item.description_es : item.description;
   const price = `$${parseFloat(item.price).toFixed(2)}`;
 
   if (compact) {
@@ -15,7 +19,7 @@ export default function MenuItemCard({ item, compact = false, action }: Props) {
       <div className="flex items-center gap-3 py-3 px-4" style={{ borderBottom: "1px solid var(--kc-cream-dark)" }}>
         <ItemImage name={item.name} imageUrl={item.image_url} size={52} />
         <div className="flex-1 min-w-0">
-          <p className="font-semibold text-sm truncate" style={{ fontFamily: "var(--font-heading)" }}>{item.name}</p>
+          <p className="font-semibold text-sm truncate" style={{ fontFamily: "var(--font-heading)" }}>{displayName}</p>
           <p className="text-xs mt-0.5" style={{ color: "var(--kc-muted)" }}>{item.category?.name}</p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
@@ -31,11 +35,11 @@ export default function MenuItemCard({ item, compact = false, action }: Props) {
       <ItemImage name={item.name} imageUrl={item.image_url} size={96} />
       <div className="flex-1">
         <h3 className="font-bold text-base leading-snug" style={{ fontFamily: "var(--font-heading)" }}>
-          {item.name}
+          {displayName}
         </h3>
-        {item.description && (
+        {displayDescription && (
           <p className="text-xs mt-1 line-clamp-2" style={{ color: "var(--kc-muted)" }}>
-            {item.description}
+            {displayDescription}
           </p>
         )}
       </div>

@@ -9,6 +9,7 @@ import QrRedeemCard from "@/components/ui/QrRedeemCard";
 import QrStampCard from "@/components/ui/QrStampCard";
 import { account as accountApi, type DashboardData, type RewardTx, type Paginated } from "@/lib/api";
 import { getToken } from "@/contexts/AuthContext";
+import { PURCHASES_ENABLED } from "@/lib/features";
 
 // ── Reward transaction row ────────────────────────────────────────────────────
 
@@ -255,7 +256,9 @@ export default function DashboardPage() {
             {(history?.data.length ?? 0) === 0 ? (
               <div className="kc-card p-8 text-center">
                 <p className="text-sm" style={{ color: "var(--kc-muted)" }}>
-                  No stamps yet. Make your first $6+ purchase to earn your first stamp!
+                  {PURCHASES_ENABLED
+                    ? "No stamps yet. Make your first $6+ purchase to earn your first stamp!"
+                    : "No stamps yet. Show your QR code at the counter to start earning stamps!"}
                 </p>
                 <Link href="/menu" className="kc-btn mt-4 inline-flex">
                   View Menu
@@ -271,9 +274,12 @@ export default function DashboardPage() {
                 ))}
                 {history!.last_page > 1 && (
                   <p className="text-xs text-center py-3" style={{ color: "var(--kc-muted)" }}>
-                    Showing {history!.per_page} of {history!.total} — visit{" "}
-                    <Link href="/purchases" style={{ color: "var(--kc-blue-deep)" }}>purchase history</Link>
-                    {" "}for the full list.
+                    Showing {history!.per_page} of {history!.total}
+                    {PURCHASES_ENABLED && (
+                      <> — visit{" "}
+                        <Link href="/purchases" style={{ color: "var(--kc-blue-deep)" }}>purchase history</Link>
+                        {" "}for the full list.</>
+                    )}
                   </p>
                 )}
               </div>
@@ -282,11 +288,13 @@ export default function DashboardPage() {
 
           {/* ── Quick links ─────────────────────────────────────────────────── */}
           <div className="flex gap-3 mt-8">
-            <Link href="/purchases" className="kc-btn kc-btn-outline flex-1 text-center">
-              Purchase History
-            </Link>
+            {PURCHASES_ENABLED && (
+              <Link href="/purchases" className="kc-btn kc-btn-outline flex-1 text-center">
+                Purchase History
+              </Link>
+            )}
             <Link href="/menu" className="kc-btn flex-1 text-center">
-              Order Now
+              View Menu
             </Link>
           </div>
 

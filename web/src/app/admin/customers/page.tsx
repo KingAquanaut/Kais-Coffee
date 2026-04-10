@@ -24,7 +24,7 @@ export default function AdminCustomersPage() {
         setUsers(data.data);
         setMeta({ current_page: data.current_page, last_page: data.last_page });
       })
-      .catch(() => {})
+      .catch(() => setUsers([]))
       .finally(() => setLoading(false));
   }, []);
 

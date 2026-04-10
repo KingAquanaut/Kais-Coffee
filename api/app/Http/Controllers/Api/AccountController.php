@@ -4,8 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\RedemptionToken;
-use App\Models\RewardAccount;
-use App\Models\RewardTransaction;
 use App\Models\Setting;
 use App\Models\StampToken;
 use Illuminate\Http\JsonResponse;
@@ -25,14 +23,17 @@ class AccountController extends Controller
             ->limit(5)
             ->get();
 
+        $purchasesEnabled = (bool) config('app.features.purchases_enabled');
+
         return response()->json([
-            'user'             => $user,
-            'points_balance'   => $account?->points_balance ?? 0,
-            'lifetime_points'  => $account?->lifetime_points ?? 0,
-            'points_threshold' => $threshold,
-            'points_to_next'   => $account ? $account->pointsToNextReward($threshold) : $threshold,
-            'can_redeem'       => $account?->canRedeem($threshold) ?? false,
-            'recent_purchases' => $recentPurchases,
+            'user'               => $user,
+            'points_balance'     => $account?->points_balance ?? 0,
+            'lifetime_points'    => $account?->lifetime_points ?? 0,
+            'points_threshold'   => $threshold,
+            'points_to_next'     => $account ? $account->pointsToNextReward($threshold) : $threshold,
+            'can_redeem'         => $account?->canRedeem($threshold) ?? false,
+            'recent_purchases'   => $purchasesEnabled ? $recentPurchases : [],
+            'purchases_enabled'  => $purchasesEnabled,
         ]);
     }
 
@@ -75,32 +76,6 @@ class AccountController extends Controller
                 ->latest()
                 ->paginate(30)
         );
-    }
-
-    public function redeem(Request $request): JsonResponse
-    {
-        $threshold = (int) Setting::get('points_for_reward', 8);
-        $account   = $request->user()->rewardAccount;
-
-        if (! $account || ! $account->canRedeem($threshold)) {
-            return response()->json([
-                'message' => "You need {$threshold} stamps to redeem a free coffee.",
-            ], 422);
-        }
-
-        $account->decrement('points_balance', $threshold);
-
-        RewardTransaction::create([
-            'reward_account_id' => $account->id,
-            'type'              => 'redeem',
-            'points'            => -$threshold,
-            'description'       => 'Redeemed 8 stamps for a free coffee',
-        ]);
-
-        return response()->json([
-            'message'        => 'Redeemed! Enjoy your free coffee.',
-            'points_balance' => $account->fresh()->points_balance,
-        ]);
     }
 
     /**

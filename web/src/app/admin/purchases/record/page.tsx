@@ -1,7 +1,8 @@
 "use client";
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, redirect } from "next/navigation";
 import AdminLayout from "@/components/layout/AdminLayout";
+import { PURCHASES_ENABLED } from "@/lib/features";
 import ItemImage from "@/components/ui/ItemImage";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import { admin as adminApi, menu as menuApi, account as accountApi, type MenuItem, type MenuCategory, type User } from "@/lib/api";
@@ -36,6 +37,7 @@ function Stepper({ value, onDec, onInc }: { value: number; onDec: () => void; on
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function RecordPurchasePage() {
+  if (!PURCHASES_ENABLED) redirect("/admin");
   const router = useRouter();
 
   // Menu

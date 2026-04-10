@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from "react";
 import AdminLayout from "@/components/layout/AdminLayout";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
-import { admin as adminApi } from "@/lib/api";
+import { admin as adminApi, revalidate } from "@/lib/api";
 import { getToken } from "@/contexts/AuthContext";
 
 // ── Default fallback values (shown before content loads) ──────────────────
@@ -135,7 +135,7 @@ export default function AdminAboutPage() {
         }
         setForm(merged);
       })
-      .catch(() => {})
+      .catch(() => setErr("Could not load page content."))
       .finally(() => setLoading(false));
   }, [token]);
 
@@ -186,6 +186,7 @@ export default function AdminAboutPage() {
         setTP(n, { file: null, previewUrl: null, msg: "Photo saved.", saving: false, err: null });
         if (teamPhotoRefs[n - 1].current) teamPhotoRefs[n - 1].current!.value = "";
       }
+      await revalidate(["/about"]);
     } catch (e: unknown) {
       setTP(n, { saving: false, err: e instanceof Error ? e.message : "Could not save photo." });
     }
@@ -205,6 +206,7 @@ export default function AdminAboutPage() {
       const { hero_image_url, ...textFields } = form;
       void hero_image_url; // not sent — managed by uploadImage
       await adminApi.pageContent.update(token, "about", textFields);
+      await revalidate(["/about"]);
       setMsg("About page content saved.");
     } catch (e: unknown) {
       setErr(e instanceof Error ? e.message : "Could not save.");
@@ -232,6 +234,7 @@ export default function AdminAboutPage() {
         if (fileInputRef.current) fileInputRef.current.value = "";
         setImageMsg("Hero image updated.");
       }
+      await revalidate(["/about"]);
     } catch (e: unknown) {
       setImageErr(e instanceof Error ? e.message : "Could not save image.");
     } finally {
@@ -807,7 +810,7 @@ export default function AdminAboutPage() {
         style={{ background: "var(--kc-cream)", border: "1.5px solid var(--kc-border)", marginTop: "0.5rem" }}
       >
         <p className="text-xs" style={{ color: "var(--kc-muted)" }}>
-          Changes apply to the public About page immediately after saving.
+          Saves update the public About page within a few seconds.
         </p>
         <button onClick={handleSave} disabled={saving} className="kc-btn">
           {saving ? "Saving…" : "Save All"}

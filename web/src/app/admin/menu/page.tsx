@@ -3,13 +3,14 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import AdminLayout from "@/components/layout/AdminLayout";
 import ItemImage from "@/components/ui/ItemImage";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
-import { admin as adminApi, type MenuCategory, type MenuItem } from "@/lib/api";
+import { admin as adminApi, revalidate, type MenuCategory, type MenuItem } from "@/lib/api";
 import { getToken } from "@/contexts/AuthContext";
 
 type ItemForm = {
   name: string;
   name_es: string;
   description: string;
+  description_es: string;
   price: string;
   is_featured: boolean;
   is_seasonal: boolean;
@@ -17,7 +18,7 @@ type ItemForm = {
 };
 
 const emptyItemForm = (): ItemForm => ({
-  name: "", name_es: "", description: "", price: "", is_featured: false, is_seasonal: false, is_active: true,
+  name: "", name_es: "", description: "", description_es: "", price: "", is_featured: false, is_seasonal: false, is_active: true,
 });
 
 export default function AdminMenuPage() {
@@ -57,7 +58,7 @@ export default function AdminMenuPage() {
           setActiveCat(cats[0].id);
         }
       })
-      .catch(() => {})
+      .catch(() => setFormErr("Could not load menu data."))
       .finally(() => setLoading(false));
   }, [token]);
 
@@ -84,6 +85,7 @@ export default function AdminMenuPage() {
       name: item.name,
       name_es: item.name_es ?? "",
       description: item.description ?? "",
+      description_es: item.description_es ?? "",
       price: item.price,
       is_featured: item.is_featured,
       is_seasonal: item.is_seasonal,
@@ -119,6 +121,7 @@ export default function AdminMenuPage() {
         name: form.name,
         name_es: form.name_es || null,
         description: form.description,
+        description_es: form.description_es || null,
         price: parseFloat(form.price) as unknown as never,
         is_featured: form.is_featured,
         is_seasonal: form.is_seasonal,
@@ -150,6 +153,7 @@ export default function AdminMenuPage() {
 
       closeModal();
       setMsg(modal.item ? "Item updated." : "Item created.");
+      await revalidate(["/menu", "/"]);
       load();
     } catch (err: unknown) {
       setFormErr(err instanceof Error ? err.message : "Could not save.");
@@ -160,9 +164,14 @@ export default function AdminMenuPage() {
 
   const handleDelete = async (id: number) => {
     if (!token || !confirm("Delete this item?")) return;
-    await adminApi.menu.deleteItem(token, id).catch(() => {});
-    setMsg("Item deleted.");
-    load();
+    try {
+      await adminApi.menu.deleteItem(token, id);
+      setMsg("Item deleted.");
+      await revalidate(["/menu", "/"]);
+      load();
+    } catch (err: unknown) {
+      setFormErr(err instanceof Error ? err.message : "Could not delete item.");
+    }
   };
 
   const filteredItems = activeCat ? items.filter(i => i.menu_category_id === activeCat) : items;
@@ -386,6 +395,20 @@ export default function AdminMenuPage() {
                   value={form.description}
                   onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
                   className="kc-input"
+                  style={{ height: "4.5rem", resize: "vertical" }}
+                />
+              </div>
+
+              {/* ── Spanish Description ──────────────────────────────────────── */}
+              <div style={{ borderLeft: "3px solid #e8a838", paddingLeft: "0.75rem" }}>
+                <label className="kc-label" style={{ color: "#b8962e" }}>
+                  Descripción en Español <span style={{ fontWeight: 400, opacity: 0.7 }}>(Spanish Description)</span>
+                </label>
+                <textarea
+                  value={form.description_es}
+                  onChange={e => setForm(f => ({ ...f, description_es: e.target.value }))}
+                  className="kc-input"
+                  placeholder="Leave blank to use English description"
                   style={{ height: "4.5rem", resize: "vertical" }}
                 />
               </div>

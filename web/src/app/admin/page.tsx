@@ -5,6 +5,7 @@ import AdminLayout from "@/components/layout/AdminLayout";
 import LoadingSpinner from "@/components/ui/LoadingSpinner";
 import { admin as adminApi, type AdminStats } from "@/lib/api";
 import { getToken } from "@/contexts/AuthContext";
+import { PURCHASES_ENABLED } from "@/lib/features";
 
 export default function AdminDashboardPage() {
   const [data,    setData]    = useState<AdminStats | null>(null);
@@ -24,7 +25,9 @@ export default function AdminDashboardPage() {
     <AdminLayout>
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold" style={{ fontFamily: "var(--font-heading)" }}>Dashboard</h1>
-        <Link href="/admin/purchases/record" className="kc-btn">Record Purchase</Link>
+        {PURCHASES_ENABLED && (
+          <Link href="/admin/purchases/record" className="kc-btn">Record Purchase</Link>
+        )}
       </div>
 
       {error && (
@@ -36,11 +39,13 @@ export default function AdminDashboardPage() {
       {loading ? <LoadingSpinner /> : (
         <>
           {/* Stats grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <div className={`grid gap-4 mb-8 ${PURCHASES_ENABLED ? "grid-cols-2 md:grid-cols-4" : "grid-cols-2"}`}>
             {[
               { label: "Total Customers", value: data?.stats.total_users ?? "—" },
-              { label: "Purchases",       value: data?.stats.total_purchases ?? "—" },
-              { label: "Revenue (month)", value: data?.stats.month_revenue ? `$${data.stats.month_revenue}` : "—" },
+              ...(PURCHASES_ENABLED ? [
+                { label: "Purchases",       value: data?.stats.total_purchases ?? "—" },
+                { label: "Revenue (month)", value: data?.stats.month_revenue ? `$${data.stats.month_revenue}` : "—" },
+              ] : []),
               { label: "Active Items",    value: data?.stats.active_items ?? "—" },
             ].map(({ label, value }) => (
               <div key={label} className="kc-card p-5 text-center">
@@ -50,8 +55,8 @@ export default function AdminDashboardPage() {
             ))}
           </div>
 
-          {/* Top items */}
-          {(data?.top_items.length ?? 0) > 0 && (
+          {/* Top items (purchase-dependent) */}
+          {PURCHASES_ENABLED && (data?.top_items.length ?? 0) > 0 && (
             <div className="kc-card mb-6">
               <div className="px-5 py-4" style={{ borderBottom: "1px solid var(--kc-cream-dark)" }}>
                 <h2 className="font-bold text-base" style={{ fontFamily: "var(--font-heading)" }}>Top Items This Month</h2>
@@ -69,8 +74,8 @@ export default function AdminDashboardPage() {
             </div>
           )}
 
-          {/* Recent purchases */}
-          <div className="kc-card">
+          {/* Recent purchases (purchase-dependent) */}
+          {PURCHASES_ENABLED && <div className="kc-card">
             <div className="px-5 py-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--kc-cream-dark)" }}>
               <h2 className="font-bold text-base" style={{ fontFamily: "var(--font-heading)" }}>Recent Purchases</h2>
               <Link href="/admin/purchases" className="text-sm" style={{ color: "var(--kc-blue-deep)" }}>View all →</Link>
@@ -96,7 +101,7 @@ export default function AdminDashboardPage() {
                 );
               })
             )}
-          </div>
+          </div>}
         </>
       )}
     </AdminLayout>

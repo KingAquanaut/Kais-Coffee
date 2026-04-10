@@ -197,6 +197,7 @@ export function SeasonalSection({ items }: { items: MenuItem[] }) {
         >
           {items.map(item => {
             const name = (lang === "es" && item.name_es) ? item.name_es : item.name;
+            const description = (lang === "es" && item.description_es) ? item.description_es : item.description;
             const price = `$${parseFloat(item.price).toFixed(2)}`;
             return (
               <div
@@ -225,7 +226,7 @@ export function SeasonalSection({ items }: { items: MenuItem[] }) {
                   >
                     {name}
                   </p>
-                  {item.description && (
+                  {description && (
                     <p
                       className="text-xs mt-1"
                       style={{
@@ -237,7 +238,7 @@ export function SeasonalSection({ items }: { items: MenuItem[] }) {
                         overflow: "hidden",
                       }}
                     >
-                      {item.description}
+                      {description}
                     </p>
                   )}
                   <p className="font-bold mt-1.5" style={{ fontSize: "0.9rem", color: "var(--kc-gold)" }}>

@@ -15,6 +15,7 @@ class MenuCategory extends Model
         'name_es',
         'slug',
         'description',
+        'description_es',
         'image_url',
         'sort_order',
         'is_active',

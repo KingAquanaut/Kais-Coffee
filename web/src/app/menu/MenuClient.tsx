@@ -11,8 +11,9 @@ function MenuTile({ item }: { item: MenuItem }) {
   const { lang } = useLang();
   const [flipped, setFlipped] = useState(false);
   const displayName = (lang === "es" && item.name_es) ? item.name_es : item.name;
+  const displayDescription = (lang === "es" && item.description_es) ? item.description_es : item.description;
   const price = `$${parseFloat(item.price).toFixed(2)}`;
-  const hasDescription = Boolean(item.description?.trim());
+  const hasDescription = Boolean(displayDescription?.trim());
 
   const toggle = useCallback(() => {
     if (hasDescription) setFlipped(f => !f);
@@ -83,7 +84,7 @@ function MenuTile({ item }: { item: MenuItem }) {
                 overflow: "hidden",
               }}
             >
-              {item.description}
+              {displayDescription}
             </p>
             <p className="font-bold mt-2" style={{ fontSize: "0.875rem", color: "var(--kc-gold)" }}>
               {price}

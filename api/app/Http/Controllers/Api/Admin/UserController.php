@@ -33,20 +33,24 @@ class UserController extends Controller
 
     public function show(User $user): JsonResponse
     {
-        $threshold = (int) Setting::get('points_for_reward', 8);
-        $account   = $user->rewardAccount;
+        $threshold        = (int) Setting::get('points_for_reward', 8);
+        $account          = $user->rewardAccount;
+        $purchasesEnabled = (bool) config('app.features.purchases_enabled');
+
+        $eagerLoads = ['rewardAccount'];
+        if ($purchasesEnabled) {
+            $eagerLoads['purchases'] = fn ($q) => $q->with('items')->latest()->limit(10);
+        }
 
         return response()->json([
-            'user' => $user->load([
-                'rewardAccount',
-                'purchases' => fn ($q) => $q->with('items')->latest()->limit(10),
-            ]),
+            'user' => $user->load($eagerLoads),
             'reward_summary' => [
                 'points_balance'  => $account?->points_balance ?? 0,
                 'lifetime_points' => $account?->lifetime_points ?? 0,
                 'threshold'       => $threshold,
                 'can_redeem'      => $account?->canRedeem($threshold) ?? false,
             ],
+            'purchases_enabled' => $purchasesEnabled,
         ]);
     }
 
@@ -203,8 +207,14 @@ class UserController extends Controller
             ], 422);
         }
 
-        // Atomic: lock account, redeem, mark token used
+        // Atomic: lock token + account, redeem, mark token used
         $result = DB::transaction(function () use ($account, $threshold, $request, $redemption) {
+            // Lock the token row to prevent concurrent double-redeem
+            $lockedToken = RedemptionToken::lockForUpdate()->find($redemption->id);
+            if (! $lockedToken || $lockedToken->isUsed()) {
+                return null; // Already consumed by a concurrent request
+            }
+
             $locked = RewardAccount::lockForUpdate()->find($account->id);
 
             if (! $locked || $locked->points_balance < $threshold) {
@@ -212,7 +222,7 @@ class UserController extends Controller
             }
 
             // Mark token used (inside transaction for atomicity)
-            $redemption->update(['used_at' => now()]);
+            $lockedToken->update(['used_at' => now()]);
 
             $locked->decrement('points_balance', $threshold);
 
@@ -270,8 +280,14 @@ class UserController extends Controller
         $user    = $stampToken->user;
         $threshold = (int) Setting::get('points_for_reward', 8);
 
-        // Atomic: lock account, award stamp, mark token used
+        // Atomic: lock token + account, award stamp, mark token used
         $result = DB::transaction(function () use ($user, $stampToken, $request) {
+            // Lock the token row to prevent concurrent double-stamp
+            $lockedToken = StampToken::lockForUpdate()->find($stampToken->id);
+            if (! $lockedToken || $lockedToken->isUsed()) {
+                return null; // Already consumed by a concurrent request
+            }
+
             $account = RewardAccount::firstOrCreate(
                 ['user_id' => $user->id],
                 ['points_balance' => 0, 'lifetime_points' => 0]
@@ -280,7 +296,7 @@ class UserController extends Controller
             $locked = RewardAccount::lockForUpdate()->find($account->id);
 
             // Mark token used (inside transaction for atomicity)
-            $stampToken->update(['used_at' => now()]);
+            $lockedToken->update(['used_at' => now()]);
 
             $locked->increment('points_balance', 1);
             $locked->increment('lifetime_points', 1);
@@ -294,6 +310,12 @@ class UserController extends Controller
 
             return $locked->fresh();
         });
+
+        if (! $result) {
+            return response()->json([
+                'message' => 'This code has already been used.',
+            ], 409);
+        }
 
         return response()->json([
             'message'         => 'Stamp added!',

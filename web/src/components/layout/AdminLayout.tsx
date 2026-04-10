@@ -4,17 +4,20 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
 import LoadingSpinner from "../ui/LoadingSpinner";
+import { PURCHASES_ENABLED } from "@/lib/features";
 
-const navItems = [
+const allNavItems = [
   { href: "/admin",                    label: "Dashboard" },
   { href: "/admin/scan",               label: "Scan QR" },
-  { href: "/admin/purchases/record",   label: "Record Purchase" },
-  { href: "/admin/purchases",          label: "Purchase History" },
+  { href: "/admin/purchases/record",   label: "Record Purchase",  purchaseOnly: true },
+  { href: "/admin/purchases",          label: "Purchase History",  purchaseOnly: true },
   { href: "/admin/menu",               label: "Menu Management" },
   { href: "/admin/customers",          label: "Customers" },
   { href: "/admin/content/home",       label: "Home Page" },
   { href: "/admin/content/about",      label: "About Page" },
 ];
+
+const navItems = allNavItems.filter(i => !i.purchaseOnly || PURCHASES_ENABLED);
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, logout } = useAuth();

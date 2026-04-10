@@ -4,13 +4,16 @@ import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { useLang } from "@/contexts/LangContext";
 import SettingsMenu from "@/components/ui/SettingsMenu";
+import { PURCHASES_ENABLED } from "@/lib/features";
 
-const NAV_ITEMS = [
+const ALL_NAV_ITEMS = [
   { href: "/menu",      labelKey: "menu"    as const, icon: "☕" },
   { href: "/dashboard", labelKey: "rewards" as const, icon: "★" },
-  { href: "/purchases", labelKey: "history" as const, icon: "🧾" },
+  { href: "/purchases", labelKey: "history" as const, icon: "🧾", purchaseOnly: true as const },
   { href: "/profile",   labelKey: "profile" as const, icon: "◉" },
 ];
+
+const NAV_ITEMS = ALL_NAV_ITEMS.filter(i => !("purchaseOnly" in i) || PURCHASES_ENABLED);
 
 // Tab bar labels per language — kept separate from the main schema to avoid
 // over-engineering for a 4-item mobile bar.
@@ -47,7 +50,7 @@ export default function AppNav() {
             {[
               { href: "/menu", label: strings.nav.menu },
               { href: "/dashboard", label: strings.nav.myRewards },
-              { href: "/purchases", label: strings.nav.purchaseHistory },
+              ...(PURCHASES_ENABLED ? [{ href: "/purchases", label: strings.nav.purchaseHistory }] : []),
               { href: "/profile", label: strings.nav.accountSettings },
             ].map(({ href, label }) => {
               const active = pathname === href || (href !== "/" && pathname.startsWith(href));

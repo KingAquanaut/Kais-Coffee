@@ -17,6 +17,7 @@ class MenuItem extends Model
         'name_es',
         'slug',
         'description',
+        'description_es',
         'price',
         'image_url',
         'is_active',

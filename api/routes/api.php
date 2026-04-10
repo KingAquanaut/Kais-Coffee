@@ -35,8 +35,12 @@ Route::get('/v1/health', function () {
 Route::prefix('v1')->group(function () {
 
     // ── Public Auth ────────────────────────────────────────────────────────
-    Route::post('/auth/register', [AuthController::class, 'register']);
-    Route::post('/auth/login',    [AuthController::class, 'login']);
+    Route::post('/auth/register',        [AuthController::class, 'register']);
+    Route::post('/auth/login',           [AuthController::class, 'login']);
+    Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword'])
+        ->middleware('throttle:5,1');   // max 5 requests per minute per IP
+    Route::post('/auth/reset-password',  [AuthController::class, 'resetPassword'])
+        ->middleware('throttle:5,1');
 
     // ── Public Menu (QR code target) ───────────────────────────────────────
     Route::prefix('menu')->group(function () {
@@ -59,11 +63,13 @@ Route::prefix('v1')->group(function () {
 
         Route::prefix('account')->group(function () {
             Route::get('/dashboard',       [AccountController::class, 'dashboard']);
-            Route::get('/purchases',       [AccountController::class, 'purchases']);
+            Route::get('/purchases',       [AccountController::class, 'purchases'])->middleware('purchases');
             Route::get('/rewards/balance', [AccountController::class, 'rewardsBalance']);
             Route::get('/rewards/history', [AccountController::class, 'rewardsHistory']);
-            Route::post('/rewards/qr-token', [AccountController::class, 'generateQrToken']);
-            Route::post('/rewards/stamp-qr-token', [AccountController::class, 'generateStampQrToken']);
+            Route::post('/rewards/qr-token', [AccountController::class, 'generateQrToken'])
+                ->middleware('throttle:10,1');       // max 10 per minute per user
+            Route::post('/rewards/stamp-qr-token', [AccountController::class, 'generateStampQrToken'])
+                ->middleware('throttle:10,1');
         });
 
         // ── Admin ──────────────────────────────────────────────────────────
@@ -74,8 +80,10 @@ Route::prefix('v1')->group(function () {
             Route::apiResource('/users', UserController::class)->only(['index', 'show', 'update']);
             Route::post('/users/{user}/adjust-stamps',  [UserController::class, 'adjustStamps']);
             Route::post('/users/{user}/redeem-reward',   [UserController::class, 'redeemReward']);
-            Route::post('/scan-redeem',                   [UserController::class, 'scanRedeem']);
-            Route::post('/scan-stamp',                   [UserController::class, 'scanStamp']);
+            Route::post('/scan-redeem',                   [UserController::class, 'scanRedeem'])
+                ->middleware('throttle:20,1');   // max 20 scans per minute per admin
+            Route::post('/scan-stamp',                   [UserController::class, 'scanStamp'])
+                ->middleware('throttle:20,1');
 
             Route::prefix('menu')->group(function () {
                 Route::apiResource('/categories', MenuCategoryController::class);
@@ -83,10 +91,12 @@ Route::prefix('v1')->group(function () {
                 Route::post('/items/{menuItem}/image', [MenuItemController::class, 'uploadImage']);
             });
 
-            Route::get   ('/purchases',                   [PurchaseController::class, 'index']);
-            Route::post  ('/purchases',                   [PurchaseController::class, 'store']);
-            Route::get   ('/purchases/{purchase}',        [PurchaseController::class, 'show']);
-            Route::patch ('/purchases/{purchase}/void',   [PurchaseController::class, 'void']);
+            Route::middleware('purchases')->group(function () {
+                Route::get   ('/purchases',                   [PurchaseController::class, 'index']);
+                Route::post  ('/purchases',                   [PurchaseController::class, 'store']);
+                Route::get   ('/purchases/{purchase}',        [PurchaseController::class, 'show']);
+                Route::patch ('/purchases/{purchase}/void',   [PurchaseController::class, 'void']);
+            });
 
             Route::get('/settings',       [SettingController::class, 'index']);
             Route::put('/settings/{key}', [SettingController::class, 'update']);
