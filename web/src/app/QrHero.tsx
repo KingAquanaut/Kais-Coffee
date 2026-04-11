@@ -1,7 +1,26 @@
 "use client";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { useLang } from "@/contexts/LangContext";
 import { useAuth } from "@/contexts/AuthContext";
+
+// ── Lightweight QR analytics ─────────────────────────────────────────────────
+// Fires once per page load. Uses navigator.sendBeacon when available so the
+// event survives tab-close / navigation. Falls back to fetch for older browsers.
+// No heavy SDK — just a POST to our own API.
+const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+
+function trackQr(event: string, meta?: Record<string, string | number | boolean>) {
+  const payload = JSON.stringify({ event, ts: Date.now(), ...meta });
+  const url = `${BASE}/analytics/qr`;
+  try {
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(url, new Blob([payload], { type: "application/json" }));
+    } else {
+      fetch(url, { method: "POST", body: payload, headers: { "Content-Type": "application/json" }, keepalive: true }).catch(() => {});
+    }
+  } catch { /* analytics must never break the page */ }
+}
 
 // ── Mini stamp grid (compact, inline) ────────────────────────────────────────
 function MiniStamps({ filled, total }: { filled: number; total: number }) {
@@ -47,6 +66,16 @@ export default function QrHero() {
   const points = user?.reward_account?.points_balance ?? 0;
   const stampsInCycle = points % THRESHOLD;
   const remaining = THRESHOLD - stampsInCycle;
+
+  // ── Analytics: track QR landing view (once) ────────────────────────────
+  const tracked = useRef(false);
+  useEffect(() => {
+    if (tracked.current) return;
+    tracked.current = true;
+    trackQr("qr_landing_view", { authenticated: loggedIn });
+  }, [loggedIn]);
+
+  const trackCta = (cta: string) => trackQr("qr_cta_click", { cta, authenticated: loggedIn });
 
   return (
     <div
@@ -166,6 +195,7 @@ export default function QrHero() {
           {/* Primary: View Menu (always) */}
           <Link
             href="/menu"
+            onClick={() => trackCta("view_menu")}
             className="kc-btn kc-btn-gold py-3 text-sm text-center"
             style={{ width: "100%" }}
           >
@@ -176,6 +206,7 @@ export default function QrHero() {
             /* Logged in: dashboard */
             <Link
               href="/dashboard"
+              onClick={() => trackCta("my_rewards")}
               className="kc-btn kc-btn-outline py-3 text-sm text-center"
               style={{ width: "100%" }}
             >
@@ -186,12 +217,14 @@ export default function QrHero() {
             <div className="flex gap-2.5">
               <Link
                 href="/auth/register"
+                onClick={() => trackCta("join_rewards")}
                 className="kc-btn kc-btn-outline py-3 text-sm text-center flex-1"
               >
                 {s.joinRewards}
               </Link>
               <Link
                 href="/auth/login"
+                onClick={() => trackCta("sign_in")}
                 className="kc-btn kc-btn-ghost py-3 text-sm text-center flex-1"
                 style={{ color: "var(--kc-blue-deep)", fontWeight: 700 }}
               >
