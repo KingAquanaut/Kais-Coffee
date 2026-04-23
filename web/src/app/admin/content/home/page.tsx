@@ -1,7 +1,11 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import AdminLayout from "@/components/layout/AdminLayout";
-import LoadingSpinner from "@/components/ui/LoadingSpinner";
+import PageHeader from "@/components/admin/PageHeader";
+import { Card, CardHeader, CardTitle } from "@/components/admin/Card";
+import Button from "@/components/admin/Button";
+import LoadingState from "@/components/admin/LoadingState";
+import Toast from "@/components/admin/Toast";
 import { admin as adminApi, ApiError, revalidate } from "@/lib/api";
 import { getToken } from "@/contexts/AuthContext";
 
@@ -10,7 +14,6 @@ const DEFAULTS = {
   hero_heading:   "Every cup, a small pleasure.",
   hero_subtext:   "Single-origin espresso, slow-steeped cold brews, and house-baked pastries — crafted with care, for you.",
   hero_image_url: "",
-  // Pillars
   pillar_1_title:    "Espresso Bar",
   pillar_1_body:     "Single-origin beans pulled at 9 bar. Notes of dark chocolate and hazelnut.",
   pillar_1_title_es: "",
@@ -27,49 +30,19 @@ const DEFAULTS = {
 
 type Form = typeof DEFAULTS;
 
-// ── Small helpers ─────────────────────────────────────────────────────────
-function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="kc-card p-6 mb-5">
-      <h2
-        className="text-base font-bold mb-4 pb-3"
-        style={{ fontFamily: "var(--font-heading)", borderBottom: "1px solid var(--kc-cream-dark)" }}
-      >
-        {title}
-      </h2>
-      <div className="flex flex-col gap-4">{children}</div>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="kc-label">{label}</label>
-      {children}
-    </div>
-  );
-}
-
-// ── Page ──────────────────────────────────────────────────────────────────
 export default function AdminHomePage() {
   const token = getToken();
-  const [form, setForm]       = useState<Form>(DEFAULTS);
+  const [form, setForm] = useState<Form>(DEFAULTS);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving]   = useState(false);
-  const [msg, setMsg]         = useState<string | null>(null);
-  const [err, setErr]         = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState<{ kind: "success" | "error"; message: string } | null>(null);
 
-  // Hero image state
-  const [imageFile, setImageFile]           = useState<File | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
-  const [removeImageFlag, setRemoveImageFlag] = useState(false);
-  const [imageMsg, setImageMsg]             = useState<string | null>(null);
-  const [imageErr, setImageErr]             = useState<string | null>(null);
-  const [savingImage, setSavingImage]       = useState(false);
+  const [removeHero, setRemoveHero] = useState(false);
+  const [savingHero, setSavingHero] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load content on mount
   useEffect(() => {
     if (!token) return;
     adminApi.pageContent.get(token, "home")
@@ -80,11 +53,10 @@ export default function AdminHomePage() {
         }
         setForm(merged);
       })
-      .catch(() => setErr("Could not load page content."))
+      .catch(() => setToast({ kind: "error", message: "Could not load page content." }))
       .finally(() => setLoading(false));
   }, [token]);
 
-  // Object URL for image preview
   useEffect(() => {
     if (!imageFile) { setImagePreviewUrl(null); return; }
     const url = URL.createObjectURL(imageFile);
@@ -92,275 +64,249 @@ export default function AdminHomePage() {
     return () => URL.revokeObjectURL(url);
   }, [imageFile]);
 
-  const set = (key: keyof Form, value: string) =>
-    setForm(f => ({ ...f, [key]: value }));
+  const set = (key: keyof Form, value: string) => setForm(f => ({ ...f, [key]: value }));
 
-  // ── Save text ─────────────────────────────────────────────────────────
   const handleSave = async () => {
     if (!token) return;
-    setSaving(true); setErr(null); setMsg(null);
+    setSaving(true);
     try {
-      const { hero_image_url, ...textFields } = form;
-      void hero_image_url; // managed via uploadImage
+      const { hero_image_url: _h, ...textFields } = form;
+      void _h;
       await adminApi.pageContent.update(token, "home", textFields);
       await revalidate(["/"]);
-      setMsg("Home page content saved.");
-    } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Could not save.");
+      setToast({ kind: "success", message: "Home page saved" });
+    } catch (e) {
+      setToast({ kind: "error", message: e instanceof Error ? e.message : "Could not save." });
     } finally {
       setSaving(false);
     }
   };
 
-  // ── Save hero image ───────────────────────────────────────────────────
-  const handleSaveImage = async () => {
+  const handleSaveHero = async () => {
     if (!token) return;
-    setSavingImage(true); setImageErr(null); setImageMsg(null);
+    setSavingHero(true);
     try {
-      if (removeImageFlag) {
+      if (removeHero) {
         const updated = await adminApi.pageContent.removeImage(token, "home");
         setForm(f => ({ ...f, hero_image_url: updated.hero_image_url ?? "" }));
-        setRemoveImageFlag(false);
-        setImageMsg("Hero image removed.");
+        setRemoveHero(false);
+        setToast({ kind: "success", message: "Hero image removed" });
       } else if (imageFile) {
         const updated = await adminApi.pageContent.uploadImage(token, "home", imageFile);
         setForm(f => ({ ...f, hero_image_url: updated.hero_image_url ?? "" }));
         setImageFile(null);
         if (fileInputRef.current) fileInputRef.current.value = "";
-        setImageMsg("Hero image updated.");
+        setToast({ kind: "success", message: "Hero image updated" });
       }
       await revalidate(["/"]);
-    } catch (e: unknown) {
-      if (e instanceof ApiError && e.errors?.image) {
-        setImageErr(e.errors.image[0]);
-      } else {
-        setImageErr(e instanceof Error ? e.message : "Could not save image.");
-      }
+    } catch (e) {
+      const msg = e instanceof ApiError && e.errors?.image ? e.errors.image[0]
+                : e instanceof Error ? e.message : "Could not save image.";
+      setToast({ kind: "error", message: msg });
     } finally {
-      setSavingImage(false);
+      setSavingHero(false);
     }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] ?? null;
     if (file && file.size > 20 * 1024 * 1024) {
-      setImageErr("File is too large — max 20 MB.");
+      setToast({ kind: "error", message: "File is too large — max 20 MB" });
       if (fileInputRef.current) fileInputRef.current.value = "";
       return;
     }
     setImageFile(file);
-    if (file) { setRemoveImageFlag(false); setImageErr(null); }
+    if (file) setRemoveHero(false);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const currentImageUrl = removeImageFlag ? null : (imagePreviewUrl ?? (form.hero_image_url || null));
+  const currentImageUrl = removeHero ? null : (imagePreviewUrl ?? (form.hero_image_url || null));
 
-  if (loading) return (
-    <AdminLayout>
-      <div className="flex justify-center py-20"><LoadingSpinner /></div>
-    </AdminLayout>
-  );
+  if (loading) {
+    return <AdminLayout><LoadingState text="Loading page content…" /></AdminLayout>;
+  }
 
   return (
     <AdminLayout>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold" style={{ fontFamily: "var(--font-heading)" }}>
-          Home Page
-        </h1>
-        <button onClick={handleSave} disabled={saving} className="kc-btn">
-          {saving ? "Saving…" : "Save All"}
-        </button>
-      </div>
+      <PageHeader
+        eyebrow="Content"
+        title="Home Page"
+        description="Edit the public landing page — hero, and the three pillars below it."
+        actions={
+          <Button variant="primary" onClick={handleSave} loading={saving}>
+            Save changes
+          </Button>
+        }
+      />
 
-      {msg && (
-        <div
-          className="mb-4 py-2.5 px-4 rounded-lg text-sm cursor-pointer"
-          style={{ background: "#d1fae5", color: "var(--kc-success)" }}
-          onClick={() => setMsg(null)}
-        >
-          {msg}
-        </div>
-      )}
-      {err && (
-        <div
-          className="mb-4 py-2.5 px-4 rounded-lg text-sm cursor-pointer"
-          style={{ background: "#fee2e2", color: "var(--kc-error)" }}
-          onClick={() => setErr(null)}
-        >
-          {err}
-        </div>
-      )}
-
-      {/* ── Hero Image ──────────────────────────────────────────────────── */}
-      <SectionCard title="Hero Background Image">
-        <div className="flex items-center gap-4">
-          {/* Preview */}
-          <div
-            style={{
-              width: 120, height: 72, borderRadius: "0.75rem", overflow: "hidden", flexShrink: 0,
-              background: "linear-gradient(160deg, #c4d9ec 0%, #d6e8f5 100%)",
-              border: "1.5px solid var(--kc-border)",
-            }}
-          >
-            {currentImageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={currentImageUrl} alt="Hero preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-            ) : (
-              <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <span style={{ fontSize: "0.65rem", color: "var(--kc-muted)", textAlign: "center", padding: "0 8px" }}>No image</span>
-              </div>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-2 flex-1 min-w-0">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              className="hidden"
-              onChange={handleFileChange}
-              id="home-hero-image"
-            />
-            <label
-              htmlFor="home-hero-image"
-              className="kc-btn kc-btn-outline kc-btn-sm text-center cursor-pointer"
-              style={{ display: "block" }}
+      <div className="flex flex-col gap-6 pb-24">
+        {/* Hero image */}
+        <Card padding="none">
+          <CardHeader><CardTitle>Hero Background Image</CardTitle></CardHeader>
+          <div className="px-5 py-5 flex items-center gap-4">
+            <div
+              className="shrink-0 overflow-hidden"
+              style={{
+                width: 140, height: 80, borderRadius: 10,
+                background: "linear-gradient(160deg, #d8c5a8 0%, #f0e8dc 100%)",
+                border: "1px solid var(--admin-border)",
+              }}
             >
-              {imageFile ? "Change file…" : "Upload image"}
-            </label>
-
-            {imageFile && (
-              <p className="text-xs truncate" style={{ color: "var(--kc-muted)" }}>{imageFile.name}</p>
-            )}
-
-            {(form.hero_image_url || imageFile) && !removeImageFlag && (
-              <button
-                type="button"
-                onClick={() => { setRemoveImageFlag(true); setImageFile(null); }}
-                className="kc-btn kc-btn-sm"
-                style={{ background: "transparent", border: "1.5px solid var(--kc-error)", color: "var(--kc-error)" }}
-              >
-                Remove image
-              </button>
-            )}
-
-            {removeImageFlag && (
-              <p className="text-xs" style={{ color: "var(--kc-error)" }}>
-                Image will be removed on save.{" "}
-                <button
-                  type="button"
-                  onClick={() => setRemoveImageFlag(false)}
-                  style={{ textDecoration: "underline", background: "none", border: "none", cursor: "pointer", color: "inherit", fontSize: "inherit", padding: 0 }}
-                >
-                  Undo
-                </button>
+              {currentImageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={currentImageUrl} alt="Hero preview"
+                     style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-xs"
+                     style={{ color: "var(--admin-ink-faint)" }}>
+                  No image
+                </div>
+              )}
+            </div>
+            <div className="flex flex-col gap-2 flex-1 min-w-0">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                onChange={handleFileChange}
+                id="home-hero-image"
+              />
+              <div className="flex gap-2 flex-wrap">
+                <label htmlFor="home-hero-image" className="cursor-pointer">
+                  <span
+                    className="inline-flex items-center justify-center px-3 h-9 text-sm font-semibold rounded-lg"
+                    style={{
+                      border: "1px solid var(--admin-border-strong)",
+                      background: "var(--admin-surface)",
+                      color: "var(--admin-ink)",
+                    }}
+                  >
+                    {imageFile ? "Change file…" : "Upload image"}
+                  </span>
+                </label>
+                {(form.hero_image_url || imageFile) && !removeHero && (
+                  <button type="button"
+                          onClick={() => { setRemoveHero(true); setImageFile(null); }}
+                          className="text-xs font-semibold"
+                          style={{ color: "var(--admin-danger)" }}>
+                    Remove image
+                  </button>
+                )}
+                {removeHero && (
+                  <button type="button" onClick={() => setRemoveHero(false)}
+                          className="text-xs font-semibold underline"
+                          style={{ color: "var(--admin-ink-muted)" }}>
+                    Undo
+                  </button>
+                )}
+              </div>
+              {imageFile && (
+                <p className="text-xs truncate" style={{ color: "var(--admin-ink-muted)" }}>
+                  {imageFile.name}
+                </p>
+              )}
+              <p className="text-xs" style={{ color: "var(--admin-ink-muted)" }}>
+                JPEG, PNG, WebP, or GIF · max 20 MB · wide landscape works best
               </p>
-            )}
+            </div>
+            <Button
+              variant="secondary" size="sm"
+              onClick={handleSaveHero}
+              loading={savingHero}
+              disabled={!imageFile && !removeHero}
+            >
+              Save image
+            </Button>
           </div>
-        </div>
+        </Card>
 
-        <p className="text-xs" style={{ color: "var(--kc-muted)" }}>
-          JPEG, PNG, WebP or GIF · max 20 MB. Displayed as the full-bleed hero background on the home page. When no image is set, a soft blue gradient is shown instead.
-        </p>
-
-        {imageMsg && <p className="text-xs" style={{ color: "var(--kc-success)" }}>{imageMsg}</p>}
-        {imageErr && <p className="text-xs" style={{ color: "var(--kc-error)" }}>{imageErr}</p>}
-
-        <button
-          onClick={handleSaveImage}
-          disabled={savingImage || (!imageFile && !removeImageFlag)}
-          className="kc-btn kc-btn-sm kc-btn-outline"
-          style={{ alignSelf: "flex-start" }}
-        >
-          {savingImage ? "Saving…" : "Save Image"}
-        </button>
-      </SectionCard>
-
-      {/* ── Hero Text ───────────────────────────────────────────────────── */}
-      <SectionCard title="Hero Text">
-        <Field label="Heading">
-          <input
-            type="text"
-            value={form.hero_heading}
-            onChange={e => set("hero_heading", e.target.value)}
-            className="kc-input"
-            placeholder="Every cup, a small pleasure."
-          />
-        </Field>
-        <Field label="Subtext">
-          <textarea
-            value={form.hero_subtext}
-            onChange={e => set("hero_subtext", e.target.value)}
-            className="kc-input"
-            style={{ height: "5rem", resize: "vertical" }}
-            placeholder="Single-origin espresso, slow-steeped cold brews…"
-          />
-        </Field>
-      </SectionCard>
-
-      {/* ── Pillars (3 cards below hero) ─────────────────────────────── */}
-      <SectionCard title="Three Pillars (below hero)">
-        <p className="text-xs" style={{ color: "var(--kc-muted)", marginTop: "-0.25rem" }}>
-          The three feature cards shown beneath the stamp section on the home page.
-        </p>
-        {([1, 2, 3] as const).map(n => (
-          <div key={n} style={{ paddingTop: "0.75rem", borderTop: "1px solid var(--kc-cream-dark)" }}>
-            <p className="text-xs font-bold mb-3" style={{ color: "var(--kc-muted)" }}>Pillar {n}</p>
-            <div className="grid sm:grid-cols-2 gap-3">
-              <Field label="Title">
-                <input
-                  type="text"
-                  value={form[`pillar_${n}_title`]}
-                  onChange={e => set(`pillar_${n}_title`, e.target.value)}
-                  className="kc-input"
-                />
-              </Field>
-              <Field label="Body">
-                <textarea
-                  value={form[`pillar_${n}_body`]}
-                  onChange={e => set(`pillar_${n}_body`, e.target.value)}
-                  className="kc-input"
-                  style={{ height: "4.5rem", resize: "vertical" }}
-                />
-              </Field>
-              <div style={{ borderLeft: "3px solid #e8a838", paddingLeft: "0.75rem" }}>
-                <label className="kc-label" style={{ color: "#b8962e" }}>Título <span style={{ fontWeight: 400, opacity: 0.7 }}>(Spanish)</span></label>
-                <input
-                  type="text"
-                  value={form[`pillar_${n}_title_es`]}
-                  onChange={e => set(`pillar_${n}_title_es`, e.target.value)}
-                  className="kc-input"
-                  placeholder="Leave blank to use English"
-                />
-              </div>
-              <div style={{ borderLeft: "3px solid #e8a838", paddingLeft: "0.75rem" }}>
-                <label className="kc-label" style={{ color: "#b8962e" }}>Cuerpo <span style={{ fontWeight: 400, opacity: 0.7 }}>(Spanish)</span></label>
-                <textarea
-                  value={form[`pillar_${n}_body_es`]}
-                  onChange={e => set(`pillar_${n}_body_es`, e.target.value)}
-                  className="kc-input"
-                  style={{ height: "4.5rem", resize: "vertical" }}
-                  placeholder="Leave blank to use English"
-                />
-              </div>
+        {/* Hero text */}
+        <Card padding="none">
+          <CardHeader><CardTitle>Hero Text</CardTitle></CardHeader>
+          <div className="px-5 py-5 flex flex-col gap-4">
+            <div>
+              <label className="admin-label">Heading</label>
+              <input className="admin-input" value={form.hero_heading}
+                     onChange={e => set("hero_heading", e.target.value)} />
+            </div>
+            <div>
+              <label className="admin-label">Subtext</label>
+              <textarea className="admin-textarea" rows={3} value={form.hero_subtext}
+                        onChange={e => set("hero_subtext", e.target.value)} />
             </div>
           </div>
-        ))}
-      </SectionCard>
+        </Card>
 
-      {/* Sticky bottom save bar */}
-      <div
-        className="sticky bottom-0 flex items-center justify-between gap-4 px-4 py-3 rounded-xl"
-        style={{ background: "var(--kc-cream)", border: "1.5px solid var(--kc-border)", marginTop: "0.5rem" }}
-      >
-        <p className="text-xs" style={{ color: "var(--kc-muted)" }}>
-          Saves update the public home page within a few seconds.
-        </p>
-        <button onClick={handleSave} disabled={saving} className="kc-btn">
-          {saving ? "Saving…" : "Save All"}
-        </button>
+        {/* Pillars */}
+        <Card padding="none">
+          <CardHeader>
+            <div>
+              <CardTitle>Three Pillars</CardTitle>
+              <p className="text-xs mt-0.5" style={{ color: "var(--admin-ink-muted)" }}>
+                The three feature cards below the hero on the home page.
+              </p>
+            </div>
+          </CardHeader>
+          <div className="px-5 py-5 flex flex-col gap-5">
+            {([1, 2, 3] as const).map(n => (
+              <div key={n} className={n > 1 ? "pt-5" : ""}
+                   style={n > 1 ? { borderTop: "1px solid var(--admin-border)" } : undefined}>
+                <p className="text-xs font-semibold uppercase tracking-wider mb-3"
+                   style={{ color: "var(--admin-ink-muted)" }}>Pillar {n}</p>
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="admin-label">Title · EN</label>
+                    <input className="admin-input" value={form[`pillar_${n}_title`]}
+                           onChange={e => set(`pillar_${n}_title`, e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="admin-label" style={{ color: "var(--admin-gold)" }}>Title · ES</label>
+                    <input className="admin-input" value={form[`pillar_${n}_title_es`]}
+                           onChange={e => set(`pillar_${n}_title_es`, e.target.value)}
+                           placeholder="Leave blank to use English" />
+                  </div>
+                  <div>
+                    <label className="admin-label">Body · EN</label>
+                    <textarea className="admin-textarea" rows={3} value={form[`pillar_${n}_body`]}
+                              onChange={e => set(`pillar_${n}_body`, e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="admin-label" style={{ color: "var(--admin-gold)" }}>Body · ES</label>
+                    <textarea className="admin-textarea" rows={3} value={form[`pillar_${n}_body_es`]}
+                              onChange={e => set(`pillar_${n}_body_es`, e.target.value)}
+                              placeholder="Leave blank to use English" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
       </div>
 
+      {/* Sticky save bar */}
+      <div className="fixed bottom-0 left-0 right-0 md:left-auto md:right-6 md:bottom-6 z-30 md:max-w-md">
+        <div
+          className="flex items-center justify-between gap-3 px-4 py-3 md:rounded-xl"
+          style={{
+            background: "var(--admin-surface)",
+            border: "1px solid var(--admin-border)",
+            boxShadow: "var(--admin-shadow-lg)",
+          }}
+        >
+          <div className="min-w-0">
+            <p className="text-sm font-semibold" style={{ color: "var(--admin-ink)" }}>
+              Ready to publish?
+            </p>
+            <p className="text-xs" style={{ color: "var(--admin-ink-muted)" }}>
+              Changes go live within a few seconds.
+            </p>
+          </div>
+          <Button variant="primary" onClick={handleSave} loading={saving}>Save All</Button>
+        </div>
+      </div>
+
+      {toast && <Toast kind={toast.kind} message={toast.message} onDismiss={() => setToast(null)} />}
     </AdminLayout>
   );
 }

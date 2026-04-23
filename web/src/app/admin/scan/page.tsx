@@ -1,6 +1,12 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
 import AdminLayout from "@/components/layout/AdminLayout";
+import PageHeader from "@/components/admin/PageHeader";
+import { Card, CardHeader, CardTitle } from "@/components/admin/Card";
+import Button from "@/components/admin/Button";
+import StatusBadge from "@/components/admin/StatusBadge";
+import LoadingState from "@/components/admin/LoadingState";
+import { IconQr, IconCheck, IconClose } from "@/components/admin/Icon";
 import { admin as adminApi, type ScanRedeemResponse, type ScanStampResponse, type ApiError } from "@/lib/api";
 import { getToken } from "@/contexts/AuthContext";
 
@@ -24,7 +30,6 @@ export default function AdminScanPage() {
   const html5QrRef = useRef<unknown>(null);
   const mountedRef = useRef(true);
 
-  // Clean up camera on unmount
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -53,8 +58,6 @@ export default function AdminScanPage() {
     if (!authToken) return;
 
     const trimmed = scannedToken.trim();
-
-    // Detect stamp vs redeem by prefix
     const isStamp = trimmed.startsWith("stamp:");
     const rawToken = isStamp ? trimmed.slice(6) : trimmed;
 
@@ -95,11 +98,7 @@ export default function AdminScanPage() {
 
       await scanner.start(
         { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: { width: 220, height: 220 },
-          aspectRatio: 1,
-        },
+        { fps: 10, qrbox: { width: 220, height: 220 }, aspectRatio: 1 },
         (decodedText) => {
           scanner.stop().then(() => {
             try { scanner.clear(); } catch {}
@@ -138,147 +137,165 @@ export default function AdminScanPage() {
 
   return (
     <AdminLayout>
-      <div className="max-w-lg">
-        <h1 className="text-2xl font-bold mb-1" style={{ fontFamily: "var(--font-heading)" }}>
-          Scan QR Code
-        </h1>
-        <p className="text-sm mb-6" style={{ color: "var(--kc-muted)" }}>
-          Scan a customer&apos;s QR code to add a stamp or redeem a reward.
-        </p>
+      <div className="max-w-xl">
+        <PageHeader
+          eyebrow="Operations"
+          title="Scan QR Code"
+          description="Scan a customer's QR code to add a stamp or redeem their reward."
+        />
 
-        {/* ── Success ──────────────────────────────────────────────────── */}
+        {/* ── Success ───────────────────────────────────────────── */}
         {status.kind === "success" && (() => {
           const { result } = status;
           const d = result.data;
           const isStamp = result.type === "stamp";
           return (
-            <div className="kc-card p-6 text-center">
-              <div style={{ fontSize: "3rem", marginBottom: "0.5rem" }}>
-                {isStamp ? "\u2615" : "\u2705"}
-              </div>
-              <h2 className="text-xl font-bold mb-1" style={{ fontFamily: "var(--font-heading)", color: "var(--kc-success)" }}>
-                {d.message}
-              </h2>
-              <p className="text-sm" style={{ color: "var(--kc-muted)" }}>
-                Customer: <strong>{d.customer.name}</strong>
-              </p>
-              <div className="grid grid-cols-2 gap-3 mt-4">
-                <div className="p-3 rounded-lg" style={{ background: "var(--kc-bg)" }}>
-                  <p className="text-lg font-bold" style={{ color: "var(--kc-gold)" }}>{d.points_balance}</p>
-                  <p className="text-xs" style={{ color: "var(--kc-muted)" }}>Stamps remaining</p>
+            <Card>
+              <div className="flex flex-col items-center text-center py-4">
+                <div
+                  className="flex items-center justify-center mb-4"
+                  style={{
+                    width: 64, height: 64, borderRadius: "50%",
+                    background: isStamp ? "var(--admin-accent-soft)" : "var(--admin-gold-bg)",
+                    color: isStamp ? "var(--admin-accent)" : "var(--admin-gold)",
+                  }}
+                >
+                  <IconCheck size={32} strokeWidth={2.5} />
                 </div>
-                <div className="p-3 rounded-lg" style={{ background: "var(--kc-bg)" }}>
-                  <p className="text-lg font-bold" style={{ color: "var(--kc-blue-deep)" }}>{d.lifetime_points}</p>
-                  <p className="text-xs" style={{ color: "var(--kc-muted)" }}>Lifetime stamps</p>
+                <StatusBadge tone={isStamp ? "success" : "gold"} size="sm" dot>
+                  {isStamp ? "Stamp added" : "Reward redeemed"}
+                </StatusBadge>
+                <h2 className="text-lg font-bold mt-3" style={{ color: "var(--admin-ink)" }}>
+                  {d.message}
+                </h2>
+                <p className="text-sm mt-1" style={{ color: "var(--admin-ink-muted)" }}>
+                  {d.customer.name}
+                </p>
+
+                <div className="grid grid-cols-2 gap-3 mt-5 w-full">
+                  <div className="p-3 rounded-lg text-center"
+                       style={{ background: "var(--admin-surface-alt)", border: "1px solid var(--admin-border)" }}>
+                    <p className="text-2xl font-bold tabular-nums"
+                       style={{ color: "var(--admin-gold)", fontFamily: "var(--font-heading)" }}>
+                      {d.points_balance}
+                    </p>
+                    <p className="text-xs" style={{ color: "var(--admin-ink-muted)" }}>Stamps remaining</p>
+                  </div>
+                  <div className="p-3 rounded-lg text-center"
+                       style={{ background: "var(--admin-surface-alt)", border: "1px solid var(--admin-border)" }}>
+                    <p className="text-2xl font-bold tabular-nums"
+                       style={{ color: "var(--admin-accent-deep)", fontFamily: "var(--font-heading)" }}>
+                      {d.lifetime_points}
+                    </p>
+                    <p className="text-xs" style={{ color: "var(--admin-ink-muted)" }}>Lifetime stamps</p>
+                  </div>
                 </div>
+
+                <Button variant="primary" fullWidth onClick={reset} className="mt-5">
+                  Scan another
+                </Button>
               </div>
-              <button onClick={reset} className="kc-btn w-full mt-5">
-                Scan Another
-              </button>
-            </div>
+            </Card>
           );
         })()}
 
-        {/* ── Error ───────────────────────────────────────────────────── */}
+        {/* ── Error ─────────────────────────────────────────────── */}
         {status.kind === "error" && (
-          <div className="kc-card p-6 text-center">
-            <div style={{ fontSize: "3rem", marginBottom: "0.5rem" }}>
-              &#10060;
-            </div>
-            <h2 className="text-lg font-bold mb-1" style={{ fontFamily: "var(--font-heading)", color: "var(--kc-error)" }}>
-              Scan Failed
-            </h2>
-            <p className="text-sm mb-4" style={{ color: "var(--kc-muted)" }}>
-              {status.message}
-            </p>
-            <button onClick={reset} className="kc-btn w-full">
-              Try Again
-            </button>
-          </div>
-        )}
-
-        {/* ── Verifying ───────────────────────────────────────────────── */}
-        {status.kind === "verifying" && (
-          <div className="kc-card p-8 text-center">
-            <div
-              style={{
-                width: 40, height: 40, margin: "0 auto 1rem",
-                border: "3px solid var(--kc-cream-dark)",
-                borderTopColor: "var(--kc-gold)",
-                borderRadius: "50%",
-                animation: "spin 0.6s linear infinite",
-              }}
-            />
-            <p className="text-sm font-semibold">Verifying code...</p>
-          </div>
-        )}
-
-        {/* ── Idle / Scanning ─────────────────────────────────────────── */}
-        {(status.kind === "idle" || status.kind === "scanning") && (
-          <>
-            {/* Camera scanner */}
-            <div className="kc-card p-5 mb-4">
-              <h2 className="text-sm font-bold mb-3" style={{ fontFamily: "var(--font-heading)" }}>
-                Camera Scanner
-              </h2>
-
-              {cameraError && (
-                <p className="text-xs mb-3 p-3 rounded-lg" style={{ background: "#fee2e2", color: "var(--kc-error)" }}>
-                  {cameraError}
-                </p>
-              )}
-
+          <Card>
+            <div className="flex flex-col items-center text-center py-4">
               <div
-                ref={scannerRef}
+                className="flex items-center justify-center mb-4"
                 style={{
-                  width: "100%",
-                  minHeight: cameraActive ? 300 : 0,
-                  borderRadius: "0.75rem",
-                  overflow: "hidden",
-                  background: cameraActive ? "#000" : "transparent",
+                  width: 64, height: 64, borderRadius: "50%",
+                  background: "var(--admin-danger-bg)",
+                  color: "var(--admin-danger)",
                 }}
-              />
-
-              {!cameraActive ? (
-                <button onClick={startCamera} className="kc-btn w-full mt-2">
-                  Start Camera
-                </button>
-              ) : (
-                <button onClick={stopCamera} className="kc-btn kc-btn-outline w-full mt-2">
-                  Stop Camera
-                </button>
-              )}
-            </div>
-
-            {/* Manual fallback */}
-            <div className="kc-card p-5">
-              <h2 className="text-sm font-bold mb-3" style={{ fontFamily: "var(--font-heading)" }}>
-                Manual Token Entry
+              >
+                <IconClose size={32} strokeWidth={2.5} />
+              </div>
+              <h2 className="text-lg font-bold" style={{ color: "var(--admin-ink)" }}>
+                Scan failed
               </h2>
-              <form onSubmit={handleManualSubmit} className="flex gap-2">
-                <input
-                  className="kc-input flex-1"
-                  value={manualToken}
-                  onChange={e => setManualToken(e.target.value)}
-                  placeholder="Paste token (stamp:... or raw hex)"
-                  style={{ fontFamily: "monospace", fontSize: "0.8125rem" }}
-                />
-                <button
-                  type="submit"
-                  disabled={!manualToken.trim()}
-                  className="kc-btn kc-btn-gold shrink-0"
-                >
-                  Submit
-                </button>
-              </form>
+              <p className="text-sm mt-1" style={{ color: "var(--admin-ink-muted)" }}>
+                {status.message}
+              </p>
+              <Button variant="primary" fullWidth onClick={reset} className="mt-5">
+                Try again
+              </Button>
             </div>
-          </>
+          </Card>
+        )}
+
+        {/* ── Verifying ─────────────────────────────────────────── */}
+        {status.kind === "verifying" && (
+          <Card>
+            <LoadingState text="Verifying code…" />
+          </Card>
+        )}
+
+        {/* ── Idle / Scanning ───────────────────────────────────── */}
+        {(status.kind === "idle" || status.kind === "scanning") && (
+          <div className="flex flex-col gap-4">
+            {/* Camera */}
+            <Card padding="none">
+              <CardHeader>
+                <CardTitle>Camera Scanner</CardTitle>
+                <StatusBadge tone={cameraActive ? "success" : "neutral"} size="sm" dot>
+                  {cameraActive ? "Live" : "Idle"}
+                </StatusBadge>
+              </CardHeader>
+              <div className="p-5">
+                {cameraError && (
+                  <div
+                    className="mb-3 px-3 py-2 rounded-md text-xs"
+                    style={{ background: "var(--admin-danger-bg)", color: "var(--admin-danger)" }}
+                  >
+                    {cameraError}
+                  </div>
+                )}
+                <div
+                  ref={scannerRef}
+                  style={{
+                    width: "100%",
+                    minHeight: cameraActive ? 300 : 0,
+                    borderRadius: 10,
+                    overflow: "hidden",
+                    background: cameraActive ? "#000" : "transparent",
+                  }}
+                />
+                {!cameraActive ? (
+                  <Button variant="primary" fullWidth leftIcon={<IconQr size={16} />} onClick={startCamera} className="mt-3">
+                    Start camera
+                  </Button>
+                ) : (
+                  <Button variant="secondary" fullWidth onClick={stopCamera} className="mt-3">
+                    Stop camera
+                  </Button>
+                )}
+              </div>
+            </Card>
+
+            {/* Manual */}
+            <Card padding="none">
+              <CardHeader><CardTitle>Manual Token Entry</CardTitle></CardHeader>
+              <div className="p-5">
+                <form onSubmit={handleManualSubmit} className="flex gap-2">
+                  <input
+                    className="admin-input flex-1"
+                    value={manualToken}
+                    onChange={e => setManualToken(e.target.value)}
+                    placeholder="Paste token (stamp:… or raw hex)"
+                    style={{ fontFamily: "monospace", fontSize: "0.8125rem" }}
+                  />
+                  <Button variant="gold" type="submit" disabled={!manualToken.trim()} className="shrink-0">
+                    Submit
+                  </Button>
+                </form>
+              </div>
+            </Card>
+          </div>
         )}
       </div>
-
-      <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-      `}</style>
     </AdminLayout>
   );
 }

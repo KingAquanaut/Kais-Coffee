@@ -1,7 +1,16 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import AdminLayout from "@/components/layout/AdminLayout";
-import LoadingSpinner from "@/components/ui/LoadingSpinner";
+import PageHeader from "@/components/admin/PageHeader";
+import { Card, CardHeader, CardTitle } from "@/components/admin/Card";
+import Button from "@/components/admin/Button";
+import StatusBadge from "@/components/admin/StatusBadge";
+import EmptyState from "@/components/admin/EmptyState";
+import LoadingState from "@/components/admin/LoadingState";
+import FormDrawer from "@/components/admin/FormDrawer";
+import ConfirmDialog from "@/components/admin/ConfirmDialog";
+import Toast from "@/components/admin/Toast";
+import { IconEdit, IconUsers, IconChevronLeft, IconChevronRight, IconTrash } from "@/components/admin/Icon";
 import { admin as adminApi, revalidate } from "@/lib/api";
 import { getToken } from "@/contexts/AuthContext";
 
@@ -23,12 +32,15 @@ const DEFAULTS = {
   team_subtext: "Our baristas are trained extensively — not just in technique, but in hospitality.",
   team_member_1_name: "Kai",
   team_member_1_role: "Founder & Head Barista",
+  team_member_1_bio: "",
   team_member_1_photo_url: "",
   team_member_2_name: "",
   team_member_2_role: "",
+  team_member_2_bio: "",
   team_member_2_photo_url: "",
   team_member_3_name: "",
   team_member_3_role: "",
+  team_member_3_bio: "",
   team_member_3_photo_url: "",
   visit_heading: "Where to find us.",
   location_address: "123 Roastery Lane\nYour City, ST 00000",
@@ -36,14 +48,12 @@ const DEFAULTS = {
   location_hours_saturday: "8 am – 5 pm",
   location_hours_sunday: "9 am – 3 pm",
   location_map_embed: "",
-  // Social media & contact
   social_instagram: "",
   social_facebook: "",
   social_tiktok: "",
   social_twitter: "",
   social_email: "",
   social_phone: "",
-  // Spanish overrides — shown when language = Español
   hero_heading_es: "",
   hero_subtext_es: "",
   story_heading_es: "",
@@ -61,41 +71,7 @@ const DEFAULTS = {
 };
 
 type Form = typeof DEFAULTS;
-
-// ── Small helpers ─────────────────────────────────────────────────────────
-function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="kc-card p-6 mb-5">
-      <h2
-        className="text-base font-bold mb-4 pb-3"
-        style={{ fontFamily: "var(--font-heading)", borderBottom: "1px solid var(--kc-cream-dark)" }}
-      >
-        {title}
-      </h2>
-      <div className="flex flex-col gap-4">{children}</div>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="kc-label">{label}</label>
-      {children}
-    </div>
-  );
-}
-
-function EsField({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div style={{ borderLeft: "3px solid #e8a838", paddingLeft: "0.75rem" }}>
-      <label className="kc-label" style={{ color: "#b8962e" }}>
-        🇪🇸 {label} <span style={{ fontWeight: 400, opacity: 0.7 }}>(Español)</span>
-      </label>
-      {children}
-    </div>
-  );
-}
+type TeamSlot = 1 | 2 | 3;
 
 // ── Page ──────────────────────────────────────────────────────────────────
 export default function AdminAboutPage() {
@@ -103,28 +79,19 @@ export default function AdminAboutPage() {
   const [form, setForm] = useState<Form>(DEFAULTS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ kind: "success" | "error"; message: string } | null>(null);
 
   // Hero image state
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
-  const [removeImageFlag, setRemoveImageFlag] = useState(false);
-  const [imageMsg, setImageMsg] = useState<string | null>(null);
-  const [imageErr, setImageErr] = useState<string | null>(null);
-  const [savingImage, setSavingImage] = useState(false);
+  const [removeHero, setRemoveHero] = useState(false);
+  const [savingHero, setSavingHero] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Team photo state (one entry per member slot)
-  type TeamPhotoState = { file: File | null; previewUrl: string | null; removing: boolean; saving: boolean; msg: string | null; err: string | null; };
-  const [teamPhotos, setTeamPhotos] = useState<Record<number, TeamPhotoState>>({
-    1: { file: null, previewUrl: null, removing: false, saving: false, msg: null, err: null },
-    2: { file: null, previewUrl: null, removing: false, saving: false, msg: null, err: null },
-    3: { file: null, previewUrl: null, removing: false, saving: false, msg: null, err: null },
-  });
-  const teamPhotoRefs = [useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null), useRef<HTMLInputElement>(null)];
+  // Team drawer state
+  const [teamSlot, setTeamSlot] = useState<TeamSlot | null>(null);
+  const [clearSlot, setClearSlot] = useState<TeamSlot | null>(null);
 
-  // Load content on mount
   useEffect(() => {
     if (!token) return;
     adminApi.pageContent.get(token, "about")
@@ -135,11 +102,10 @@ export default function AdminAboutPage() {
         }
         setForm(merged);
       })
-      .catch(() => setErr("Could not load page content."))
+      .catch(() => setToast({ kind: "error", message: "Could not load page content." }))
       .finally(() => setLoading(false));
   }, [token]);
 
-  // Object URL for hero image preview
   useEffect(() => {
     if (!imageFile) { setImagePreviewUrl(null); return; }
     const url = URL.createObjectURL(imageFile);
@@ -147,676 +113,821 @@ export default function AdminAboutPage() {
     return () => URL.revokeObjectURL(url);
   }, [imageFile]);
 
-  // Object URLs for team photo previews
-  useEffect(() => {
-    const revokes: (() => void)[] = [];
-    ([1, 2, 3] as const).forEach(n => {
-      const file = teamPhotos[n].file;
-      if (!file) return;
-      const url = URL.createObjectURL(file);
-      setTeamPhotos(prev => ({ ...prev, [n]: { ...prev[n], previewUrl: url } }));
-      revokes.push(() => URL.revokeObjectURL(url));
-    });
-    return () => revokes.forEach(r => r());
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [teamPhotos[1].file, teamPhotos[2].file, teamPhotos[3].file]);
-
-  const setTP = (n: number, patch: Partial<TeamPhotoState>) =>
-    setTeamPhotos(prev => ({ ...prev, [n]: { ...prev[n], ...patch } }));
-
-  const handleTeamPhotoChange = (n: number, e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] ?? null;
-    setTP(n, { file, removing: false, msg: null, err: null });
-    if (teamPhotoRefs[n - 1].current) teamPhotoRefs[n - 1].current!.value = "";
-  };
-
-  const handleSaveTeamPhoto = async (n: number) => {
-    if (!token) return;
-    const tp = teamPhotos[n];
-    setTP(n, { saving: true, msg: null, err: null });
-    try {
-      const imageKey = `team_member_${n}_photo`;
-      if (tp.removing) {
-        const updated = await adminApi.pageContent.removeImageByKey(token, "about", imageKey);
-        setForm(f => ({ ...f, [`team_member_${n}_photo_url`]: updated[`team_member_${n}_photo_url`] ?? "" }));
-        setTP(n, { removing: false, file: null, previewUrl: null, msg: "Photo removed.", saving: false, err: null });
-      } else if (tp.file) {
-        const updated = await adminApi.pageContent.uploadImageByKey(token, "about", imageKey, tp.file);
-        setForm(f => ({ ...f, [`team_member_${n}_photo_url`]: updated[`team_member_${n}_photo_url`] ?? "" }));
-        setTP(n, { file: null, previewUrl: null, msg: "Photo saved.", saving: false, err: null });
-        if (teamPhotoRefs[n - 1].current) teamPhotoRefs[n - 1].current!.value = "";
-      }
-      await revalidate(["/about"]);
-    } catch (e: unknown) {
-      setTP(n, { saving: false, err: e instanceof Error ? e.message : "Could not save photo." });
-    }
-  };
-
-  const set = (key: keyof Form, value: string) =>
-    setForm(f => ({ ...f, [key]: value }));
+  const set = (key: keyof Form, value: string) => setForm(f => ({ ...f, [key]: value }));
+  const showMsg = (kind: "success" | "error", message: string) => setToast({ kind, message });
 
   // ── Save text content ─────────────────────────────────────────────────
   const handleSave = async () => {
     if (!token) return;
     setSaving(true);
-    setErr(null);
-    setMsg(null);
     try {
-      // Send all fields except hero_image_url (managed separately)
-      const { hero_image_url, ...textFields } = form;
-      void hero_image_url; // not sent — managed by uploadImage
+      const { hero_image_url: _h, ...textFields } = form;
+      void _h;
       await adminApi.pageContent.update(token, "about", textFields);
       await revalidate(["/about"]);
-      setMsg("About page content saved.");
-    } catch (e: unknown) {
-      setErr(e instanceof Error ? e.message : "Could not save.");
+      showMsg("success", "About page saved");
+    } catch (e) {
+      showMsg("error", e instanceof Error ? e.message : "Could not save.");
     } finally {
       setSaving(false);
     }
   };
 
   // ── Save hero image ───────────────────────────────────────────────────
-  const handleSaveImage = async () => {
+  const handleSaveHero = async () => {
     if (!token) return;
-    setSavingImage(true);
-    setImageErr(null);
-    setImageMsg(null);
+    setSavingHero(true);
     try {
-      if (removeImageFlag) {
+      if (removeHero) {
         const updated = await adminApi.pageContent.removeImage(token, "about");
         setForm(f => ({ ...f, hero_image_url: updated.hero_image_url ?? "" }));
-        setRemoveImageFlag(false);
-        setImageMsg("Hero image removed.");
+        setRemoveHero(false);
+        showMsg("success", "Hero image removed");
       } else if (imageFile) {
         const updated = await adminApi.pageContent.uploadImage(token, "about", imageFile);
         setForm(f => ({ ...f, hero_image_url: updated.hero_image_url ?? "" }));
         setImageFile(null);
         if (fileInputRef.current) fileInputRef.current.value = "";
-        setImageMsg("Hero image updated.");
+        showMsg("success", "Hero image updated");
       }
       await revalidate(["/about"]);
-    } catch (e: unknown) {
-      setImageErr(e instanceof Error ? e.message : "Could not save image.");
+    } catch (e) {
+      showMsg("error", e instanceof Error ? e.message : "Could not save image.");
     } finally {
-      setSavingImage(false);
+      setSavingHero(false);
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] ?? null;
-    if (file && file.size > 20 * 1024 * 1024) {
-      setImageErr("File is too large — max 20 MB.");
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      return;
-    }
-    setImageFile(file);
-    if (file) { setRemoveImageFlag(false); setImageErr(null); }
-    if (fileInputRef.current) fileInputRef.current.value = "";
+  const currentHeroUrl = removeHero ? null : (imagePreviewUrl ?? (form.hero_image_url || null));
+
+  // ── Team helpers ──────────────────────────────────────────────────────
+  const teamMember = (n: TeamSlot) => ({
+    name:  form[`team_member_${n}_name`] as string,
+    role:  form[`team_member_${n}_role`] as string,
+    bio:   (form[`team_member_${n}_bio`] ?? "") as string,
+    photo: form[`team_member_${n}_photo_url`] as string,
+  });
+
+  /** Swap two team slots (all fields) */
+  const swapSlots = (a: TeamSlot, b: TeamSlot) => {
+    setForm(f => {
+      const next = { ...f };
+      (["name", "role", "bio", "photo_url"] as const).forEach(k => {
+        const keyA = `team_member_${a}_${k}` as keyof Form;
+        const keyB = `team_member_${b}_${k}` as keyof Form;
+        const tmp = next[keyA]; next[keyA] = next[keyB]; next[keyB] = tmp;
+      });
+      return next;
+    });
   };
 
-  // Current image to preview: local preview > existing DB URL
-  const currentImageUrl = removeImageFlag ? null : (imagePreviewUrl ?? (form.hero_image_url || null));
+  const handleClearSlot = async () => {
+    if (!clearSlot) return;
+    const n = clearSlot;
+    // Wipe text fields locally; if there's a photo, remove it on the server
+    const hasPhoto = !!form[`team_member_${n}_photo_url`];
+    setForm(f => ({
+      ...f,
+      [`team_member_${n}_name`]: "",
+      [`team_member_${n}_role`]: "",
+      [`team_member_${n}_bio`]: "",
+      [`team_member_${n}_photo_url`]: "",
+    }));
+    setClearSlot(null);
 
-  if (loading) return (
-    <AdminLayout>
-      <div className="flex justify-center py-20"><LoadingSpinner /></div>
-    </AdminLayout>
-  );
+    if (hasPhoto && token) {
+      try {
+        await adminApi.pageContent.removeImageByKey(token, "about", `team_member_${n}_photo`);
+      } catch { /* image removal failed — UI already cleared, will retry on next save */ }
+    }
+    showMsg("success", "Team member cleared (remember to Save)");
+  };
+
+  // Populated slots (for display / reorder bounds)
+  const populated: TeamSlot[] = ([1, 2, 3] as TeamSlot[]).filter(n => (teamMember(n).name || "").trim() !== "");
+
+  if (loading) {
+    return <AdminLayout><LoadingState text="Loading page content…" /></AdminLayout>;
+  }
 
   return (
     <AdminLayout>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-3xl font-bold" style={{ fontFamily: "var(--font-heading)" }}>
-          About Page
-        </h1>
-        <button onClick={handleSave} disabled={saving} className="kc-btn">
-          {saving ? "Saving…" : "Save All"}
-        </button>
-      </div>
+      <PageHeader
+        eyebrow="Content"
+        title="About Page"
+        description="Edit the public About page — hero, story, team, and contact info."
+        actions={
+          <Button variant="primary" onClick={handleSave} loading={saving}>
+            Save changes
+          </Button>
+        }
+      />
 
-      {msg && (
-        <div
-          className="mb-4 py-2.5 px-4 rounded-lg text-sm cursor-pointer"
-          style={{ background: "#d1fae5", color: "var(--kc-success)" }}
-          onClick={() => setMsg(null)}
-        >
-          {msg}
-        </div>
-      )}
-      {err && (
-        <div
-          className="mb-4 py-2.5 px-4 rounded-lg text-sm cursor-pointer"
-          style={{ background: "#fee2e2", color: "var(--kc-error)" }}
-          onClick={() => setErr(null)}
-        >
-          {err}
-        </div>
-      )}
-
-      {/* ── Hero Image ──────────────────────────────────────────────────── */}
-      <SectionCard title="Hero Image">
-        <div className="flex items-center gap-4">
-          {/* Preview */}
-          <div
-            style={{
-              width: 96, height: 96, borderRadius: "0.75rem", overflow: "hidden", flexShrink: 0,
-              background: "linear-gradient(145deg, #bcd8ed 0%, #d6e8f5 100%)",
-              border: "1.5px solid var(--kc-border)",
-            }}
-          >
-            {currentImageUrl
-              ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={currentImageUrl} alt="Hero preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              ) : (
-                <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  <span style={{ fontSize: "0.7rem", color: "var(--kc-muted)", textAlign: "center", padding: "0 8px" }}>No image</span>
-                </div>
-              )
-            }
-          </div>
-
-          <div className="flex flex-col gap-2 flex-1 min-w-0">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              className="hidden"
-              onChange={handleFileChange}
-              id="hero-image-upload"
-            />
-            <label
-              htmlFor="hero-image-upload"
-              className="kc-btn kc-btn-outline kc-btn-sm text-center cursor-pointer"
-              style={{ display: "block" }}
-            >
-              {imageFile ? "Change file…" : "Upload image"}
-            </label>
-
-            {imageFile && (
-              <p className="text-xs truncate" style={{ color: "var(--kc-muted)" }}>{imageFile.name}</p>
-            )}
-
-            {(form.hero_image_url || imageFile) && !removeImageFlag && (
-              <button
-                type="button"
-                onClick={() => { setRemoveImageFlag(true); setImageFile(null); }}
-                className="kc-btn kc-btn-sm"
-                style={{ background: "transparent", border: "1.5px solid var(--kc-error)", color: "var(--kc-error)" }}
+      <div className="flex flex-col gap-6 pb-24">
+        {/* ── Hero image ─────────────────────────────────────────────── */}
+        <Card padding="none">
+          <CardHeader><CardTitle>Hero Image</CardTitle></CardHeader>
+          <div className="px-5 py-5">
+            <div className="flex items-center gap-4">
+              <div
+                className="shrink-0 overflow-hidden"
+                style={{
+                  width: 120, height: 80, borderRadius: 10,
+                  background: "linear-gradient(145deg, #f0e8dc 0%, #e8d7be 100%)",
+                  border: "1px solid var(--admin-border)",
+                }}
               >
-                Remove image
-              </button>
-            )}
+                {currentHeroUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={currentHeroUrl} alt="Hero preview"
+                       style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-xs"
+                       style={{ color: "var(--admin-ink-faint)" }}>
+                    No image
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col gap-2 flex-1 min-w-0">
+                <input
+                  ref={fileInputRef}
+                  id="hero-image"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  className="hidden"
+                  onChange={e => {
+                    const f = e.target.files?.[0] ?? null;
+                    if (f && f.size > 20 * 1024 * 1024) {
+                      showMsg("error", "File is too large — max 20 MB");
+                      if (fileInputRef.current) fileInputRef.current.value = "";
+                      return;
+                    }
+                    setImageFile(f);
+                    if (f) setRemoveHero(false);
+                    if (fileInputRef.current) fileInputRef.current.value = "";
+                  }}
+                />
+                <div className="flex gap-2 flex-wrap">
+                  <label htmlFor="hero-image" className="cursor-pointer">
+                    <span
+                      className="inline-flex items-center justify-center px-3 h-9 text-sm font-semibold rounded-lg"
+                      style={{
+                        border: "1px solid var(--admin-border-strong)",
+                        background: "var(--admin-surface)",
+                        color: "var(--admin-ink)",
+                      }}
+                    >
+                      {imageFile ? "Change file…" : "Upload image"}
+                    </span>
+                  </label>
+                  {(form.hero_image_url || imageFile) && !removeHero && (
+                    <button
+                      type="button"
+                      onClick={() => { setRemoveHero(true); setImageFile(null); }}
+                      className="text-xs font-semibold"
+                      style={{ color: "var(--admin-danger)" }}
+                    >
+                      Remove image
+                    </button>
+                  )}
+                  {removeHero && (
+                    <button type="button" onClick={() => setRemoveHero(false)}
+                            className="text-xs font-semibold underline"
+                            style={{ color: "var(--admin-ink-muted)" }}>
+                      Undo remove
+                    </button>
+                  )}
+                </div>
+                {imageFile && (
+                  <p className="text-xs truncate" style={{ color: "var(--admin-ink-muted)" }}>
+                    {imageFile.name}
+                  </p>
+                )}
+                <p className="text-xs" style={{ color: "var(--admin-ink-muted)" }}>
+                  JPEG, PNG, WebP, or GIF · max 20 MB · wide landscape (~3:2) works best
+                </p>
+              </div>
+              <Button
+                variant="secondary" size="sm"
+                onClick={handleSaveHero}
+                loading={savingHero}
+                disabled={!imageFile && !removeHero}
+              >
+                Save image
+              </Button>
+            </div>
+          </div>
+        </Card>
 
-            {removeImageFlag && (
-              <p className="text-xs" style={{ color: "var(--kc-error)" }}>
-                Image will be removed on save.{" "}
-                <button
-                  type="button"
-                  onClick={() => setRemoveImageFlag(false)}
-                  style={{ textDecoration: "underline", background: "none", border: "none", cursor: "pointer", color: "inherit", fontSize: "inherit", padding: 0 }}
-                >
-                  Undo
-                </button>
+        {/* ── Hero text ──────────────────────────────────────────────── */}
+        <Section title="Hero Text">
+          <BilingualField
+            label="Heading"
+            enValue={form.hero_heading}
+            esValue={form.hero_heading_es}
+            onEnChange={v => set("hero_heading", v)}
+            onEsChange={v => set("hero_heading_es", v)}
+          />
+          <BilingualField
+            label="Subtext" textarea
+            enValue={form.hero_subtext}
+            esValue={form.hero_subtext_es}
+            onEnChange={v => set("hero_subtext", v)}
+            onEsChange={v => set("hero_subtext_es", v)}
+          />
+        </Section>
+
+        {/* ── Our Story ──────────────────────────────────────────────── */}
+        <Section title="Our Story">
+          <BilingualField
+            label="Section heading"
+            enValue={form.story_heading}
+            esValue={form.story_heading_es}
+            onEnChange={v => set("story_heading", v)}
+            onEsChange={v => set("story_heading_es", v)}
+          />
+          <BilingualField
+            label="Body (blank line = new paragraph)" textarea rows={6}
+            enValue={form.story_body}
+            esValue={form.story_body_es}
+            onEnChange={v => set("story_body", v)}
+            onEsChange={v => set("story_body_es", v)}
+          />
+        </Section>
+
+        {/* ── Our Coffee ─────────────────────────────────────────────── */}
+        <Section title="Our Coffee">
+          <BilingualField
+            label="Section heading"
+            enValue={form.coffee_heading}
+            esValue={form.coffee_heading_es}
+            onEnChange={v => set("coffee_heading", v)}
+            onEsChange={v => set("coffee_heading_es", v)}
+          />
+          {([1, 2, 3] as const).map(n => (
+            <div key={n} className="pt-4 mt-2" style={{ borderTop: "1px solid var(--admin-border)" }}>
+              <p className="text-xs font-semibold uppercase tracking-wider mb-3"
+                 style={{ color: "var(--admin-ink-muted)" }}>Card {n}</p>
+              <div className="flex flex-col gap-4">
+                <BilingualField
+                  label="Title"
+                  enValue={form[`coffee_card_${n}_title`]}
+                  esValue={form[`coffee_card_${n}_title_es`]}
+                  onEnChange={v => set(`coffee_card_${n}_title`, v)}
+                  onEsChange={v => set(`coffee_card_${n}_title_es`, v)}
+                />
+                <BilingualField
+                  label="Body" textarea
+                  enValue={form[`coffee_card_${n}_body`]}
+                  esValue={form[`coffee_card_${n}_body_es`]}
+                  onEnChange={v => set(`coffee_card_${n}_body`, v)}
+                  onEsChange={v => set(`coffee_card_${n}_body_es`, v)}
+                />
+              </div>
+            </div>
+          ))}
+        </Section>
+
+        {/* ── Meet the Team ──────────────────────────────────────────── */}
+        <Card padding="none">
+          <CardHeader>
+            <CardTitle>Meet the Team</CardTitle>
+            <p className="text-xs" style={{ color: "var(--admin-ink-muted)" }}>
+              {populated.length} / 3 members
+            </p>
+          </CardHeader>
+          <div className="px-5 py-5 flex flex-col gap-5">
+            <div className="flex flex-col gap-4">
+              <BilingualField
+                label="Section heading"
+                enValue={form.team_heading}
+                esValue={form.team_heading_es}
+                onEnChange={v => set("team_heading", v)}
+                onEsChange={v => set("team_heading_es", v)}
+              />
+              <BilingualField
+                label="Subtext" textarea
+                enValue={form.team_subtext}
+                esValue={form.team_subtext_es}
+                onEnChange={v => set("team_subtext", v)}
+                onEsChange={v => set("team_subtext_es", v)}
+              />
+            </div>
+
+            {/* Team cards */}
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {([1, 2, 3] as TeamSlot[]).map(n => {
+                const m = teamMember(n);
+                const empty = !m.name.trim();
+                return (
+                  <div
+                    key={n}
+                    className="flex flex-col p-4 rounded-xl"
+                    style={{
+                      background: empty ? "var(--admin-surface-alt)" : "var(--admin-surface)",
+                      border: `1px solid ${empty ? "var(--admin-border)" : "var(--admin-border-strong)"}`,
+                      borderStyle: empty ? "dashed" : "solid",
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="shrink-0 overflow-hidden"
+                        style={{
+                          width: 56, height: 56, borderRadius: "50%",
+                          background: "linear-gradient(145deg, #f0e8dc 0%, #d8c5a8 100%)",
+                          border: "1px solid var(--admin-border)",
+                        }}
+                      >
+                        {m.photo ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={m.photo} alt={m.name}
+                               style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-base font-bold"
+                               style={{ color: "var(--admin-ink-faint)", fontFamily: "var(--font-heading)" }}>
+                            {m.name.charAt(0).toUpperCase() || "—"}
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-semibold text-sm truncate" style={{ color: "var(--admin-ink)" }}>
+                          {m.name || <span style={{ color: "var(--admin-ink-faint)", fontWeight: 400 }}>Empty slot</span>}
+                        </p>
+                        <p className="text-xs truncate" style={{ color: "var(--admin-ink-muted)" }}>
+                          {m.role || "—"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {m.bio && (
+                      <p className="text-xs mt-3 line-clamp-3" style={{ color: "var(--admin-ink-muted)" }}>
+                        {m.bio}
+                      </p>
+                    )}
+
+                    <div className="flex items-center gap-1 mt-3 pt-3"
+                         style={{ borderTop: "1px solid var(--admin-border)" }}>
+                      {/* Reorder */}
+                      <button
+                        onClick={() => swapSlots(n, (n - 1) as TeamSlot)}
+                        disabled={n === 1}
+                        className="p-1.5 rounded-md disabled:opacity-30"
+                        style={{ color: "var(--admin-ink-muted)" }}
+                        title="Move up"
+                        aria-label="Move up"
+                      >
+                        <IconChevronLeft size={14} />
+                      </button>
+                      <button
+                        onClick={() => swapSlots(n, (n + 1) as TeamSlot)}
+                        disabled={n === 3}
+                        className="p-1.5 rounded-md disabled:opacity-30"
+                        style={{ color: "var(--admin-ink-muted)" }}
+                        title="Move down"
+                        aria-label="Move down"
+                      >
+                        <IconChevronRight size={14} />
+                      </button>
+                      <span className="text-[10px] font-semibold tracking-wider uppercase ml-1"
+                            style={{ color: "var(--admin-ink-faint)" }}>
+                        Slot {n}
+                      </span>
+
+                      <div className="ml-auto flex items-center gap-1">
+                        {!empty && (
+                          <button
+                            onClick={() => setClearSlot(n)}
+                            className="p-1.5 rounded-md"
+                            style={{ color: "var(--admin-danger)" }}
+                            title="Clear member"
+                            aria-label="Clear member"
+                          >
+                            <IconTrash size={14} />
+                          </button>
+                        )}
+                        <Button
+                          variant="secondary" size="sm"
+                          leftIcon={<IconEdit size={14} />}
+                          onClick={() => setTeamSlot(n)}
+                        >
+                          {empty ? "Add" : "Edit"}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {populated.length === 0 && (
+              <div className="pt-2">
+                <EmptyState
+                  icon={<IconUsers />}
+                  title="No team members yet"
+                  description="Add up to three team members with photo, name, role and bio."
+                />
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* ── Where to Find Us ───────────────────────────────────────── */}
+        <Section title="Where to Find Us">
+          <BilingualField
+            label="Section heading"
+            enValue={form.visit_heading}
+            esValue={form.visit_heading_es}
+            onEnChange={v => set("visit_heading", v)}
+            onEsChange={v => set("visit_heading_es", v)}
+          />
+          <div>
+            <label className="admin-label">Address</label>
+            <textarea
+              className="admin-textarea"
+              rows={3}
+              value={form.location_address}
+              onChange={e => set("location_address", e.target.value)}
+            />
+            <p className="text-xs mt-1" style={{ color: "var(--admin-ink-muted)" }}>
+              Line breaks are preserved when rendered.
+            </p>
+          </div>
+          <div className="grid sm:grid-cols-3 gap-3">
+            <TextField label="Mon – Fri hours" value={form.location_hours_weekday}
+                       onChange={v => set("location_hours_weekday", v)} placeholder="7 am – 6 pm" />
+            <TextField label="Saturday hours" value={form.location_hours_saturday}
+                       onChange={v => set("location_hours_saturday", v)} placeholder="8 am – 5 pm" />
+            <TextField label="Sunday hours" value={form.location_hours_sunday}
+                       onChange={v => set("location_hours_sunday", v)} placeholder="9 am – 3 pm" />
+          </div>
+          <div>
+            <label className="admin-label">Google Maps embed URL</label>
+            <textarea
+              className="admin-textarea" rows={2}
+              value={form.location_map_embed}
+              onChange={e => set("location_map_embed", e.target.value)}
+              placeholder="https://www.google.com/maps/embed?pb=..."
+            />
+            {form.location_map_embed && !form.location_map_embed.includes("/maps/embed") && (
+              <p className="text-xs mt-1" style={{ color: "var(--admin-danger)" }}>
+                This doesn&apos;t look like an embed URL. In Google Maps: Share → Embed a map → copy the <code>src=</code> value.
               </p>
             )}
           </div>
-        </div>
+        </Section>
 
-        <p className="text-xs" style={{ color: "var(--kc-muted)" }}>
-          JPEG, PNG, WebP or GIF · max 20 MB. Displayed as the hero background on the About page.
-        </p>
-
-        {imageMsg && (
-          <p className="text-xs" style={{ color: "var(--kc-success)" }}>{imageMsg}</p>
-        )}
-        {imageErr && (
-          <p className="text-xs" style={{ color: "var(--kc-error)" }}>{imageErr}</p>
-        )}
-
-        <button
-          onClick={handleSaveImage}
-          disabled={savingImage || (!imageFile && !removeImageFlag)}
-          className="kc-btn kc-btn-sm kc-btn-outline"
-          style={{ alignSelf: "flex-start" }}
-        >
-          {savingImage ? "Saving…" : "Save Image"}
-        </button>
-      </SectionCard>
-
-      {/* ── Hero Text ───────────────────────────────────────────────────── */}
-      <SectionCard title="Hero">
-        <Field label="Heading">
-          <input
-            type="text"
-            value={form.hero_heading}
-            onChange={e => set("hero_heading", e.target.value)}
-            className="kc-input"
-          />
-        </Field>
-        <EsField label="Encabezado">
-          <input
-            type="text"
-            value={form.hero_heading_es}
-            onChange={e => set("hero_heading_es", e.target.value)}
-            className="kc-input"
-            placeholder="Spanish heading (leave blank to use English)"
-          />
-        </EsField>
-        <Field label="Subtext">
-          <textarea
-            value={form.hero_subtext}
-            onChange={e => set("hero_subtext", e.target.value)}
-            className="kc-input"
-            style={{ height: "4rem", resize: "vertical" }}
-          />
-        </Field>
-        <EsField label="Subtexto">
-          <textarea
-            value={form.hero_subtext_es}
-            onChange={e => set("hero_subtext_es", e.target.value)}
-            className="kc-input"
-            style={{ height: "4rem", resize: "vertical" }}
-            placeholder="Spanish subtext (leave blank to use English)"
-          />
-        </EsField>
-      </SectionCard>
-
-      {/* ── Our Story ───────────────────────────────────────────────────── */}
-      <SectionCard title="Our Story">
-        <Field label="Section Heading">
-          <input
-            type="text"
-            value={form.story_heading}
-            onChange={e => set("story_heading", e.target.value)}
-            className="kc-input"
-          />
-        </Field>
-        <EsField label="Encabezado de Sección">
-          <input
-            type="text"
-            value={form.story_heading_es}
-            onChange={e => set("story_heading_es", e.target.value)}
-            className="kc-input"
-            placeholder="Spanish heading (leave blank to use English)"
-          />
-        </EsField>
-        <Field label="Body (separate paragraphs with a blank line)">
-          <textarea
-            value={form.story_body}
-            onChange={e => set("story_body", e.target.value)}
-            className="kc-input"
-            style={{ height: "8rem", resize: "vertical" }}
-          />
-        </Field>
-        <EsField label="Cuerpo">
-          <textarea
-            value={form.story_body_es}
-            onChange={e => set("story_body_es", e.target.value)}
-            className="kc-input"
-            style={{ height: "8rem", resize: "vertical" }}
-            placeholder="Spanish body (leave blank to use English)"
-          />
-        </EsField>
-      </SectionCard>
-
-      {/* ── Our Coffee ──────────────────────────────────────────────────── */}
-      <SectionCard title="Our Coffee">
-        <Field label="Section Heading">
-          <input
-            type="text"
-            value={form.coffee_heading}
-            onChange={e => set("coffee_heading", e.target.value)}
-            className="kc-input"
-          />
-        </Field>
-        <EsField label="Encabezado de Sección">
-          <input
-            type="text"
-            value={form.coffee_heading_es}
-            onChange={e => set("coffee_heading_es", e.target.value)}
-            className="kc-input"
-            placeholder="Spanish heading (leave blank to use English)"
-          />
-        </EsField>
-        {([1, 2, 3] as const).map(n => (
-          <div key={n} style={{ paddingTop: "0.5rem", borderTop: "1px solid var(--kc-cream-dark)" }}>
-            <p className="text-xs font-bold mb-3" style={{ color: "var(--kc-muted)" }}>Card {n}</p>
-            <div className="grid sm:grid-cols-2 gap-3">
-              <Field label="Title">
-                <input
-                  type="text"
-                  value={form[`coffee_card_${n}_title`]}
-                  onChange={e => set(`coffee_card_${n}_title`, e.target.value)}
-                  className="kc-input"
-                />
-              </Field>
-              <Field label="Body">
-                <textarea
-                  value={form[`coffee_card_${n}_body`]}
-                  onChange={e => set(`coffee_card_${n}_body`, e.target.value)}
-                  className="kc-input"
-                  style={{ height: "4.5rem", resize: "vertical" }}
-                />
-              </Field>
-              <EsField label="Título">
-                <input
-                  type="text"
-                  value={form[`coffee_card_${n}_title_es`]}
-                  onChange={e => set(`coffee_card_${n}_title_es`, e.target.value)}
-                  className="kc-input"
-                  placeholder="Spanish title"
-                />
-              </EsField>
-              <EsField label="Cuerpo">
-                <textarea
-                  value={form[`coffee_card_${n}_body_es`]}
-                  onChange={e => set(`coffee_card_${n}_body_es`, e.target.value)}
-                  className="kc-input"
-                  style={{ height: "4.5rem", resize: "vertical" }}
-                  placeholder="Spanish body"
-                />
-              </EsField>
-            </div>
+        {/* ── Contact ────────────────────────────────────────────────── */}
+        <Section title="Contact & Social Media"
+                 description="Shown in the Connect with us section. Leave blank to hide.">
+          <div className="grid sm:grid-cols-2 gap-3">
+            <TextField label="Instagram URL"  value={form.social_instagram}
+                       onChange={v => set("social_instagram", v)} placeholder="https://instagram.com/kaiscoffee" />
+            <TextField label="Facebook URL"   value={form.social_facebook}
+                       onChange={v => set("social_facebook", v)} placeholder="https://facebook.com/kaiscoffee" />
+            <TextField label="TikTok URL"     value={form.social_tiktok}
+                       onChange={v => set("social_tiktok", v)} placeholder="https://tiktok.com/@kaiscoffee" />
+            <TextField label="X / Twitter URL" value={form.social_twitter}
+                       onChange={v => set("social_twitter", v)} placeholder="https://x.com/kaiscoffee" />
+            <TextField label="Email"          value={form.social_email}
+                       onChange={v => set("social_email", v)} placeholder="hello@kaiscoffee.com" />
+            <TextField label="Phone"          value={form.social_phone}
+                       onChange={v => set("social_phone", v)} placeholder="(817) 555-0123" />
           </div>
-        ))}
-      </SectionCard>
-
-      {/* ── Meet the Team ───────────────────────────────────────────────── */}
-      <SectionCard title="Meet the Team">
-        <Field label="Section Heading">
-          <input
-            type="text"
-            value={form.team_heading}
-            onChange={e => set("team_heading", e.target.value)}
-            className="kc-input"
-          />
-        </Field>
-        <EsField label="Encabezado de Sección">
-          <input
-            type="text"
-            value={form.team_heading_es}
-            onChange={e => set("team_heading_es", e.target.value)}
-            className="kc-input"
-            placeholder="Spanish heading (leave blank to use English)"
-          />
-        </EsField>
-        <Field label="Subtext">
-          <textarea
-            value={form.team_subtext}
-            onChange={e => set("team_subtext", e.target.value)}
-            className="kc-input"
-            style={{ height: "4rem", resize: "vertical" }}
-          />
-        </Field>
-        <EsField label="Subtexto">
-          <textarea
-            value={form.team_subtext_es}
-            onChange={e => set("team_subtext_es", e.target.value)}
-            className="kc-input"
-            style={{ height: "4rem", resize: "vertical" }}
-            placeholder="Spanish subtext (leave blank to use English)"
-          />
-        </EsField>
-        {([1, 2, 3] as const).map(n => {
-          const tp = teamPhotos[n];
-          const existingPhotoUrl = form[`team_member_${n}_photo_url`];
-          const currentPhotoUrl = tp.removing ? null : (tp.previewUrl ?? (existingPhotoUrl || null));
-          return (
-            <div key={n} style={{ paddingTop: "0.75rem", borderTop: "1px solid var(--kc-cream-dark)" }}>
-              <p className="text-xs font-bold mb-3" style={{ color: "var(--kc-muted)" }}>Team Member {n}</p>
-
-              {/* Name + Role */}
-              <div className="grid sm:grid-cols-2 gap-3 mb-4">
-                <Field label="Name">
-                  <input
-                    type="text"
-                    value={form[`team_member_${n}_name`]}
-                    onChange={e => set(`team_member_${n}_name`, e.target.value)}
-                    className="kc-input"
-                    placeholder="Leave blank to hide"
-                  />
-                </Field>
-                <Field label="Role">
-                  <input
-                    type="text"
-                    value={form[`team_member_${n}_role`]}
-                    onChange={e => set(`team_member_${n}_role`, e.target.value)}
-                    className="kc-input"
-                    placeholder="e.g. Barista"
-                  />
-                </Field>
-              </div>
-
-              {/* Photo upload */}
-              <div className="flex items-center gap-4">
-                {/* Photo preview circle */}
-                <div
-                  style={{
-                    width: 72, height: 72, borderRadius: "50%", overflow: "hidden", flexShrink: 0,
-                    background: "linear-gradient(145deg, #e8f2fa 0%, #bcd8ed 100%)",
-                    border: "1.5px solid var(--kc-border)",
-                  }}
-                >
-                  {currentPhotoUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={currentPhotoUrl} alt="Photo preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  ) : (
-                    <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                      <svg width="28" height="28" viewBox="0 0 40 40" fill="none" aria-hidden="true" style={{ opacity: 0.4 }}>
-                        <circle cx="20" cy="14" r="7" stroke="#3a7ca5" strokeWidth="2" fill="rgba(58,124,165,0.12)" />
-                        <path d="M5 36c0-8.284 6.716-15 15-15s15 6.716 15 15" stroke="#3a7ca5" strokeWidth="2" strokeLinecap="round" fill="none" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex flex-col gap-2 flex-1 min-w-0">
-                  <input
-                    ref={teamPhotoRefs[n - 1]}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif"
-                    className="hidden"
-                    onChange={e => handleTeamPhotoChange(n, e)}
-                    id={`team-photo-${n}`}
-                  />
-                  <label
-                    htmlFor={`team-photo-${n}`}
-                    className="kc-btn kc-btn-outline kc-btn-sm text-center cursor-pointer"
-                    style={{ display: "block" }}
-                  >
-                    {tp.file ? "Change file…" : "Upload photo"}
-                  </label>
-                  {tp.file && (
-                    <p className="text-xs truncate" style={{ color: "var(--kc-muted)" }}>{tp.file.name}</p>
-                  )}
-                  {(existingPhotoUrl || tp.file) && !tp.removing && (
-                    <button
-                      type="button"
-                      onClick={() => setTP(n, { removing: true, file: null, previewUrl: null })}
-                      className="kc-btn kc-btn-sm"
-                      style={{ background: "transparent", border: "1.5px solid var(--kc-error)", color: "var(--kc-error)" }}
-                    >
-                      Remove photo
-                    </button>
-                  )}
-                  {tp.removing && (
-                    <p className="text-xs" style={{ color: "var(--kc-error)" }}>
-                      Photo will be removed on save.{" "}
-                      <button
-                        type="button"
-                        onClick={() => setTP(n, { removing: false })}
-                        style={{ textDecoration: "underline", background: "none", border: "none", cursor: "pointer", color: "inherit", fontSize: "inherit", padding: 0 }}
-                      >
-                        Undo
-                      </button>
-                    </p>
-                  )}
-                  {tp.msg && <p className="text-xs" style={{ color: "var(--kc-success)" }}>{tp.msg}</p>}
-                  {tp.err && <p className="text-xs" style={{ color: "var(--kc-error)" }}>{tp.err}</p>}
-                  <button
-                    onClick={() => handleSaveTeamPhoto(n)}
-                    disabled={tp.saving || (!tp.file && !tp.removing)}
-                    className="kc-btn kc-btn-sm kc-btn-outline"
-                    style={{ alignSelf: "flex-start" }}
-                  >
-                    {tp.saving ? "Saving…" : "Save Photo"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </SectionCard>
-
-      {/* ── Where to Find Us ────────────────────────────────────────────── */}
-      <SectionCard title="Where to Find Us">
-        <Field label="Section Heading">
-          <input
-            type="text"
-            value={form.visit_heading}
-            onChange={e => set("visit_heading", e.target.value)}
-            className="kc-input"
-          />
-        </Field>
-        <EsField label="Encabezado de Sección">
-          <input
-            type="text"
-            value={form.visit_heading_es}
-            onChange={e => set("visit_heading_es", e.target.value)}
-            className="kc-input"
-            placeholder="Spanish heading (leave blank to use English)"
-          />
-        </EsField>
-        <Field label="Address (use line breaks for formatting)">
-          <textarea
-            value={form.location_address}
-            onChange={e => set("location_address", e.target.value)}
-            className="kc-input"
-            style={{ height: "4rem", resize: "vertical" }}
-          />
-        </Field>
-        <div className="grid sm:grid-cols-3 gap-3">
-          <Field label="Mon – Fri hours">
-            <input
-              type="text"
-              value={form.location_hours_weekday}
-              onChange={e => set("location_hours_weekday", e.target.value)}
-              className="kc-input"
-              placeholder="7 am – 6 pm"
-            />
-          </Field>
-          <Field label="Saturday hours">
-            <input
-              type="text"
-              value={form.location_hours_saturday}
-              onChange={e => set("location_hours_saturday", e.target.value)}
-              className="kc-input"
-              placeholder="8 am – 5 pm"
-            />
-          </Field>
-          <Field label="Sunday hours">
-            <input
-              type="text"
-              value={form.location_hours_sunday}
-              onChange={e => set("location_hours_sunday", e.target.value)}
-              className="kc-input"
-              placeholder="9 am – 3 pm"
-            />
-          </Field>
-        </div>
-        <Field label="Map embed URL (must be a Google Maps embed URL)">
-          <textarea
-            value={form.location_map_embed}
-            onChange={e => set("location_map_embed", e.target.value)}
-            className="kc-input"
-            style={{ height: "3.5rem", resize: "vertical" }}
-            placeholder="https://www.google.com/maps/embed?pb=..."
-          />
-          {form.location_map_embed && !form.location_map_embed.includes("/maps/embed") && (
-            <p className="text-xs mt-1" style={{ color: "var(--kc-error)" }}>
-              ⚠ This doesn&apos;t look like an embed URL. In Google Maps: Share → Embed a map → copy the <code>src=</code> value (it must contain <code>/maps/embed</code>).
-            </p>
-          )}
-        </Field>
-      </SectionCard>
-
-      {/* ── Contact & Social Media ─────────────────────────────────── */}
-      <SectionCard title="Contact & Social Media">
-        <p className="text-xs -mt-2 mb-2" style={{ color: "var(--kc-muted)" }}>
-          These links appear in the &quot;Connect with us&quot; section on the About page. Leave blank to hide.
-        </p>
-        <div className="grid sm:grid-cols-2 gap-3">
-          <Field label="Instagram URL">
-            <input
-              type="text"
-              value={form.social_instagram}
-              onChange={e => set("social_instagram", e.target.value)}
-              className="kc-input"
-              placeholder="https://instagram.com/kaiscoffee"
-            />
-          </Field>
-          <Field label="Facebook URL">
-            <input
-              type="text"
-              value={form.social_facebook}
-              onChange={e => set("social_facebook", e.target.value)}
-              className="kc-input"
-              placeholder="https://facebook.com/kaiscoffee"
-            />
-          </Field>
-          <Field label="TikTok URL">
-            <input
-              type="text"
-              value={form.social_tiktok}
-              onChange={e => set("social_tiktok", e.target.value)}
-              className="kc-input"
-              placeholder="https://tiktok.com/@kaiscoffee"
-            />
-          </Field>
-          <Field label="X / Twitter URL">
-            <input
-              type="text"
-              value={form.social_twitter}
-              onChange={e => set("social_twitter", e.target.value)}
-              className="kc-input"
-              placeholder="https://x.com/kaiscoffee"
-            />
-          </Field>
-          <Field label="Email address">
-            <input
-              type="text"
-              value={form.social_email}
-              onChange={e => set("social_email", e.target.value)}
-              className="kc-input"
-              placeholder="hello@kaiscoffee.com"
-            />
-          </Field>
-          <Field label="Phone number">
-            <input
-              type="text"
-              value={form.social_phone}
-              onChange={e => set("social_phone", e.target.value)}
-              className="kc-input"
-              placeholder="(817) 555-0123"
-            />
-          </Field>
-        </div>
-      </SectionCard>
-
-      {/* Sticky bottom save bar */}
-      <div
-        className="sticky bottom-0 flex items-center justify-between gap-4 px-4 py-3 rounded-xl"
-        style={{ background: "var(--kc-cream)", border: "1.5px solid var(--kc-border)", marginTop: "0.5rem" }}
-      >
-        <p className="text-xs" style={{ color: "var(--kc-muted)" }}>
-          Saves update the public About page within a few seconds.
-        </p>
-        <button onClick={handleSave} disabled={saving} className="kc-btn">
-          {saving ? "Saving…" : "Save All"}
-        </button>
+        </Section>
       </div>
 
+      {/* Sticky save bar */}
+      <div
+        className="fixed bottom-0 left-0 right-0 md:left-auto md:right-6 md:bottom-6 z-30 md:max-w-md"
+      >
+        <div
+          className="flex items-center justify-between gap-3 px-4 py-3 md:rounded-xl"
+          style={{
+            background: "var(--admin-surface)",
+            border: "1px solid var(--admin-border)",
+            borderBottom: "1px solid var(--admin-border)",
+            boxShadow: "var(--admin-shadow-lg)",
+          }}
+        >
+          <div className="min-w-0">
+            <p className="text-sm font-semibold" style={{ color: "var(--admin-ink)" }}>
+              Ready to publish?
+            </p>
+            <p className="text-xs" style={{ color: "var(--admin-ink-muted)" }}>
+              Changes go live within a few seconds.
+            </p>
+          </div>
+          <Button variant="primary" onClick={handleSave} loading={saving}>
+            Save All
+          </Button>
+        </div>
+      </div>
+
+      {/* Team drawer */}
+      {teamSlot && (
+        <TeamMemberDrawer
+          slot={teamSlot}
+          initial={teamMember(teamSlot)}
+          onClose={() => setTeamSlot(null)}
+          onSaveLocal={(name, role, bio) => {
+            setForm(f => ({
+              ...f,
+              [`team_member_${teamSlot}_name`]: name,
+              [`team_member_${teamSlot}_role`]: role,
+              [`team_member_${teamSlot}_bio`]:  bio,
+            }));
+            setTeamSlot(null);
+            showMsg("success", "Member updated (remember to Save)");
+          }}
+          onPhotoUploaded={url => {
+            setForm(f => ({ ...f, [`team_member_${teamSlot}_photo_url`]: url }));
+          }}
+          onError={msg => showMsg("error", msg)}
+        />
+      )}
+
+      {/* Clear slot confirm */}
+      <ConfirmDialog
+        open={clearSlot !== null}
+        onCancel={() => setClearSlot(null)}
+        onConfirm={handleClearSlot}
+        title="Clear team member?"
+        description="This removes the name, role, bio and photo from this slot. You'll still need to hit Save to publish the change."
+        confirmLabel="Clear"
+        tone="danger"
+      />
+
+      {toast && <Toast kind={toast.kind} message={toast.message} onDismiss={() => setToast(null)} />}
     </AdminLayout>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────── */
+/*  Section wrapper                                                         */
+/* ──────────────────────────────────────────────────────────────────────── */
+
+function Section({ title, description, children }: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card padding="none">
+      <CardHeader>
+        <div>
+          <CardTitle>{title}</CardTitle>
+          {description && (
+            <p className="text-xs mt-0.5" style={{ color: "var(--admin-ink-muted)" }}>
+              {description}
+            </p>
+          )}
+        </div>
+      </CardHeader>
+      <div className="px-5 py-5 flex flex-col gap-4">{children}</div>
+    </Card>
+  );
+}
+
+function TextField({ label, value, onChange, placeholder }: {
+  label: string; value: string; onChange: (v: string) => void; placeholder?: string;
+}) {
+  return (
+    <div>
+      <label className="admin-label">{label}</label>
+      <input
+        className="admin-input"
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+      />
+    </div>
+  );
+}
+
+function BilingualField({
+  label, enValue, esValue, onEnChange, onEsChange, textarea, rows = 3,
+}: {
+  label: string;
+  enValue: string;
+  esValue: string;
+  onEnChange: (v: string) => void;
+  onEsChange: (v: string) => void;
+  textarea?: boolean;
+  rows?: number;
+}) {
+  return (
+    <div className="grid sm:grid-cols-2 gap-3">
+      <div>
+        <label className="admin-label">{label} · EN</label>
+        {textarea ? (
+          <textarea className="admin-textarea" rows={rows}
+                    value={enValue} onChange={e => onEnChange(e.target.value)} />
+        ) : (
+          <input className="admin-input" value={enValue} onChange={e => onEnChange(e.target.value)} />
+        )}
+      </div>
+      <div>
+        <label className="admin-label" style={{ color: "var(--admin-gold)" }}>
+          {label} · ES
+        </label>
+        {textarea ? (
+          <textarea className="admin-textarea" rows={rows} value={esValue}
+                    onChange={e => onEsChange(e.target.value)}
+                    placeholder="Leave blank to fall back to English" />
+        ) : (
+          <input className="admin-input" value={esValue}
+                 onChange={e => onEsChange(e.target.value)}
+                 placeholder="Leave blank to fall back to English" />
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────── */
+/*  Team member drawer (with photo upload + save)                           */
+/* ──────────────────────────────────────────────────────────────────────── */
+
+function TeamMemberDrawer({
+  slot, initial, onClose, onSaveLocal, onPhotoUploaded, onError,
+}: {
+  slot: TeamSlot;
+  initial: { name: string; role: string; bio: string; photo: string };
+  onClose: () => void;
+  onSaveLocal: (name: string, role: string, bio: string) => void;
+  onPhotoUploaded: (url: string) => void;
+  onError: (msg: string) => void;
+}) {
+  const [name, setName] = useState(initial.name);
+  const [role, setRole] = useState(initial.role);
+  const [bio,  setBio]  = useState(initial.bio);
+
+  // Photo state
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [removePhoto, setRemovePhoto] = useState(false);
+  const [photoSaving, setPhotoSaving] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!photoFile) { setPreviewUrl(null); return; }
+    const url = URL.createObjectURL(photoFile);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [photoFile]);
+
+  const currentPhoto = removePhoto ? null : (previewUrl ?? (initial.photo || null));
+  const hasStoredPhoto = !!initial.photo;
+
+  const handleSavePhoto = async () => {
+    const token = getToken();
+    if (!token) return;
+    setPhotoSaving(true);
+    try {
+      const key = `team_member_${slot}_photo`;
+      if (removePhoto) {
+        const updated = await adminApi.pageContent.removeImageByKey(token, "about", key);
+        onPhotoUploaded(updated[`team_member_${slot}_photo_url`] ?? "");
+        setRemovePhoto(false);
+      } else if (photoFile) {
+        const updated = await adminApi.pageContent.uploadImageByKey(token, "about", key, photoFile);
+        onPhotoUploaded(updated[`team_member_${slot}_photo_url`] ?? "");
+        setPhotoFile(null);
+        if (fileRef.current) fileRef.current.value = "";
+      }
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "Could not save photo");
+    } finally {
+      setPhotoSaving(false);
+    }
+  };
+
+  return (
+    <FormDrawer
+      open
+      onClose={onClose}
+      title={initial.name ? "Edit team member" : `Add team member (Slot ${slot})`}
+      description={initial.name || undefined}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button variant="primary" onClick={() => onSaveLocal(name.trim(), role.trim(), bio.trim())}>
+            Apply
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-5">
+        {/* Photo */}
+        <div
+          className="p-4 rounded-lg"
+          style={{ background: "var(--admin-surface-alt)", border: "1px solid var(--admin-border)" }}
+        >
+          <label className="admin-label">Photo</label>
+          <div className="flex items-center gap-4">
+            <div
+              className="shrink-0 overflow-hidden"
+              style={{
+                width: 72, height: 72, borderRadius: "50%",
+                background: "linear-gradient(145deg, #f0e8dc 0%, #d8c5a8 100%)",
+                border: "1px solid var(--admin-border)",
+              }}
+            >
+              {currentPhoto ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={currentPhoto} alt="Preview"
+                     style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-lg font-bold"
+                     style={{ color: "var(--admin-ink-faint)", fontFamily: "var(--font-heading)" }}>
+                  {name.charAt(0).toUpperCase() || "—"}
+                </div>
+              )}
+            </div>
+            <div className="flex-1 min-w-0 flex flex-col gap-2">
+              <input
+                ref={fileRef}
+                id={`team-photo-${slot}`}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                onChange={e => {
+                  const f = e.target.files?.[0] ?? null;
+                  if (f && f.size > 20 * 1024 * 1024) {
+                    onError("File is too large — max 20 MB");
+                    if (fileRef.current) fileRef.current.value = "";
+                    return;
+                  }
+                  setPhotoFile(f);
+                  if (f) setRemovePhoto(false);
+                }}
+              />
+              <div className="flex gap-2 flex-wrap">
+                <label htmlFor={`team-photo-${slot}`} className="cursor-pointer">
+                  <span
+                    className="inline-flex items-center justify-center px-3 h-8 text-xs font-semibold rounded-lg"
+                    style={{
+                      border: "1px solid var(--admin-border-strong)",
+                      background: "var(--admin-surface)",
+                      color: "var(--admin-ink)",
+                    }}
+                  >
+                    {photoFile ? "Change…" : "Upload"}
+                  </span>
+                </label>
+                {(hasStoredPhoto || photoFile) && !removePhoto && (
+                  <button type="button"
+                          onClick={() => { setRemovePhoto(true); setPhotoFile(null); }}
+                          className="text-xs font-semibold"
+                          style={{ color: "var(--admin-danger)" }}>
+                    Remove
+                  </button>
+                )}
+                {removePhoto && (
+                  <button type="button" onClick={() => setRemovePhoto(false)}
+                          className="text-xs font-semibold underline"
+                          style={{ color: "var(--admin-ink-muted)" }}>
+                    Undo
+                  </button>
+                )}
+                <Button
+                  variant="secondary" size="sm"
+                  onClick={handleSavePhoto}
+                  loading={photoSaving}
+                  disabled={!photoFile && !removePhoto}
+                >
+                  Save photo
+                </Button>
+              </div>
+              <p className="text-xs" style={{ color: "var(--admin-ink-muted)" }}>
+                Square crop recommended · max 20 MB
+              </p>
+            </div>
+          </div>
+          <p className="text-xs mt-3" style={{ color: "var(--admin-ink-muted)" }}>
+            <StatusBadge tone="info" size="sm">Note</StatusBadge>{" "}
+            <span className="ml-1">Photo saves immediately. Name, role and bio save with the main <strong>Save All</strong> button.</span>
+          </p>
+        </div>
+
+        {/* Name / role / bio */}
+        <div>
+          <label className="admin-label">Name</label>
+          <input className="admin-input" value={name}
+                 onChange={e => setName(e.target.value)} placeholder="Full name" />
+        </div>
+        <div>
+          <label className="admin-label">Role</label>
+          <input className="admin-input" value={role}
+                 onChange={e => setRole(e.target.value)} placeholder="e.g. Head Barista" />
+        </div>
+        <div>
+          <label className="admin-label">Bio</label>
+          <textarea className="admin-textarea" rows={4} value={bio}
+                    onChange={e => setBio(e.target.value)}
+                    placeholder="A short story about this person (optional)" />
+        </div>
+      </div>
+    </FormDrawer>
   );
 }
