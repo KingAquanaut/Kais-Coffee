@@ -439,3 +439,135 @@ h1, h2, h3, h4 {
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--kc-bg-mid); border-radius: 3px; }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Admin Dashboard — separate design system
+   Warm, coffee-inspired neutrals · soft borders · SaaS feel
+   Uses --admin-* tokens so admin surfaces feel distinct from the
+   public (powder-blue) site while sharing brand gold accents.
+   ────────────────────────────────────────────────────────────────────── */
+:root {
+  --admin-bg:           #f7f4ef;         /* page canvas — warm off-white  */
+  --admin-surface:      #ffffff;          /* cards, panels                 */
+  --admin-surface-alt:  #faf8f4;          /* table header, striped rows    */
+  --admin-surface-hover:#f3efe7;          /* row / nav hover               */
+  --admin-sidebar:      #fbf8f2;          /* sidebar bg                    */
+  --admin-border:       #eae3d5;          /* hairline borders              */
+  --admin-border-strong:#d8cdb8;          /* input borders                 */
+  --admin-ink:          #2a231c;          /* primary text — soft espresso  */
+  --admin-ink-muted:    #6b6258;          /* secondary text                */
+  --admin-ink-faint:    #9a9183;          /* tertiary / placeholder        */
+  --admin-accent:       #8b6f47;          /* coffee brown — nav active     */
+  --admin-accent-deep:  #5a4a34;          /* hover / pressed               */
+  --admin-accent-soft:  #f0e8dc;          /* active nav bg                 */
+  --admin-focus:        #3a7ca5;          /* keep brand blue for focus     */
+  --admin-success:      #2d7a4e;
+  --admin-success-bg:   #dcf0e2;
+  --admin-warn:         #a26d17;
+  --admin-warn-bg:      #fbefd2;
+  --admin-danger:       #a6332f;
+  --admin-danger-bg:    #f9dcdb;
+  --admin-gold:         #b8962e;
+  --admin-gold-bg:      #f4e8c4;
+  --admin-shadow-sm:    0 1px 2px rgba(42, 35, 28, 0.04);
+  --admin-shadow:       0 2px 8px rgba(42, 35, 28, 0.06), 0 1px 2px rgba(42, 35, 28, 0.04);
+  --admin-shadow-lg:    0 12px 32px rgba(42, 35, 28, 0.12), 0 4px 10px rgba(42, 35, 28, 0.06);
+  --admin-radius:       0.75rem;
+  --admin-radius-lg:    1rem;
+}
+
+/* Admin page background override — applied by AdminLayout via `.admin-root` */
+.admin-root {
+  background: var(--admin-bg);
+  color: var(--admin-ink);
+  min-height: 100dvh;
+}
+.admin-root * { font-family: var(--font-body); }
+.admin-root h1, .admin-root h2, .admin-root h3, .admin-root h4 {
+  font-family: var(--font-heading);
+  color: var(--admin-ink);
+  letter-spacing: -0.01em;
+}
+
+/* Drawer / modal animations */
+@keyframes admin-drawer-in {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes admin-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes admin-dialog-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.admin-drawer-panel { animation: admin-drawer-in 280ms cubic-bezier(0.22, 0.61, 0.36, 1); }
+.admin-overlay      { animation: admin-fade-in 180ms ease-out; }
+.admin-dialog       { animation: admin-dialog-in 180ms cubic-bezier(0.22, 0.61, 0.36, 1); }
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-drawer-panel,
+  .admin-overlay,
+  .admin-dialog { animation: none; }
+}
+
+/* Admin button hover — inline-styled base, hover handled via CSS selectors */
+.admin-btn { transition: background 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s; }
+.admin-btn:focus-visible { box-shadow: 0 0 0 3px rgba(58,124,165,0.25); }
+.admin-btn:not(:disabled):hover { filter: brightness(0.94); }
+.admin-btn[style*="transparent"]:not(:disabled):hover { background: var(--admin-surface-hover); filter: none; }
+
+/* Admin input */
+.admin-input, .admin-select, .admin-textarea {
+  width: 100%;
+  padding: 0.5rem 0.875rem;
+  font-size: 0.9375rem;
+  font-family: var(--font-body);
+  color: var(--admin-ink);
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border-strong);
+  border-radius: 0.625rem;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.admin-input::placeholder { color: var(--admin-ink-faint); }
+.admin-input:focus, .admin-select:focus, .admin-textarea:focus {
+  border-color: var(--admin-focus);
+  box-shadow: 0 0 0 3px rgba(58,124,165,0.15);
+}
+.admin-textarea { resize: vertical; min-height: 88px; }
+
+.admin-label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  margin-bottom: 0.375rem;
+  color: var(--admin-ink);
+}
+
+/* Admin card hover (for interactive rows) */
+.admin-row {
+  transition: background 0.1s;
+}
+.admin-row:hover { background: var(--admin-surface-hover); }
+
+/* Sidebar nav items */
+.admin-nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--admin-ink-muted);
+  text-decoration: none;
+  transition: background 0.12s, color 0.12s;
+}
+.admin-nav-link:hover { background: var(--admin-surface-hover); color: var(--admin-ink); }
+.admin-nav-link.is-active {
+  background: var(--admin-accent-soft);
+  color: var(--admin-accent-deep);
+}
+.admin-nav-link.is-active svg { color: var(--admin-accent); }

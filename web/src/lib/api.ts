@@ -6,9 +6,12 @@ const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 // ── Types ──────────────────────────────────────────────────────────────────
 export type User = {
   id: number; name: string; email: string; phone: string | null; language_preference: string | null;
-  is_admin: boolean; reward_account?: RewardAccount;
+  is_admin: boolean; reward_account?: RewardAccount; created_at?: string; updated_at?: string;
 };
-export type RewardAccount = { id: number; user_id: number; points_balance: number; lifetime_points: number; };
+export type RewardAccount = {
+  id: number; user_id: number; points_balance: number; lifetime_points: number;
+  updated_at?: string;
+};
 export type MenuCategory = {
   id: number; name: string; name_es: string | null; slug: string; description: string | null; description_es: string | null; image_url: string | null;
   sort_order: number; is_active: boolean; active_items?: MenuItem[];
@@ -29,10 +32,28 @@ export type DashboardData = {
   points_to_next: number; can_redeem: boolean; recent_purchases: Purchase[];
   purchases_enabled?: boolean;
 };
+export type AdminRewardActivity = {
+  id: number;
+  type: string;
+  points: number;
+  description: string;
+  created_at: string;
+  user_name: string | null;
+  user_id: number | null;
+};
 export type AdminStats = {
-  stats: { total_users: number; total_purchases?: number; month_revenue?: string; active_items: number; };
+  stats: {
+    total_users: number;
+    total_purchases?: number;
+    month_revenue?: string;
+    active_items: number;
+    reward_ready?: number;
+    redemptions_mo?: number;
+    reward_threshold?: number;
+  };
   recent_purchases: Purchase[];
   top_items: { name: string; qty_sold: number }[];
+  recent_rewards?: AdminRewardActivity[];
   purchases_enabled?: boolean;
 };
 export type Paginated<T> = { data: T[]; current_page: number; last_page: number; per_page: number; total: number; };
