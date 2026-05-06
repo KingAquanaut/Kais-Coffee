@@ -45,4 +45,16 @@ class MenuItem extends Model
     {
         return $this->hasMany(PurchaseItem::class);
     }
+
+    public function variants(): HasMany
+    {
+        return $this->hasMany(MenuItemVariant::class)->orderBy('sort_order');
+    }
+
+    public function activeVariants(): HasMany
+    {
+        return $this->hasMany(MenuItemVariant::class)
+            ->where('is_active', true)
+            ->orderBy('sort_order');
+    }
 }

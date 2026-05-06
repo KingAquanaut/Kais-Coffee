@@ -35,6 +35,25 @@ const emptyItemForm = (): ItemForm => ({
 
 type CatForm = { name: string; name_es: string; description: string; description_es: string };
 
+type VariantRow = {
+  id?: number;
+  size_label: string;
+  price: string;
+  sort_order: number;
+  is_active: boolean;
+};
+
+const buildVariantPayload = (rows: VariantRow[]) =>
+  rows
+    .filter(r => r.size_label.trim() && r.price !== "")
+    .map((r, i) => ({
+      id: r.id,
+      size_label: r.size_label.trim(),
+      price: parseFloat(r.price),
+      sort_order: i,
+      is_active: r.is_active,
+    }));
+
 export default function AdminMenuPage() {
   const [categories, setCategories] = useState<MenuCategory[]>([]);
   const [items,      setItems]      = useState<MenuItem[]>([]);
@@ -47,15 +66,24 @@ export default function AdminMenuPage() {
   const [catDrawer,  setCatDrawer]  = useState<MenuCategory | null>(null);
   const [deleteItem, setDeleteItem] = useState<MenuItem | null>(null);
 
+  // Home-page spotlight (single featured drink)
+  const [featuredDrinkId, setFeaturedDrinkId] = useState<number | null>(null);
+  const [savingFeatured, setSavingFeatured] = useState(false);
+
   const token = getToken();
 
   const load = useCallback(() => {
     if (!token) return;
     setLoading(true);
-    Promise.all([adminApi.menu.categories(token), adminApi.menu.items(token)])
-      .then(([cats, its]) => {
+    Promise.all([
+      adminApi.menu.categories(token),
+      adminApi.menu.items(token),
+      adminApi.menu.getFeaturedDrink(token).catch(() => ({ menu_item_id: null, item: null })),
+    ])
+      .then(([cats, its, featured]) => {
         setCategories(cats);
         setItems(its);
+        setFeaturedDrinkId(featured.menu_item_id ?? null);
       })
       .catch(() => setToast({ kind: "error", message: "Could not load menu data." }))
       .finally(() => setLoading(false));
@@ -105,6 +133,29 @@ export default function AdminMenuPage() {
     revalidate(["/menu", "/"]);
   };
 
+  // Silent update — used by auto-save in the drawer. Doesn't close, doesn't toast.
+  // Public pages will be revalidated when the drawer closes.
+  const handleItemAutoSaved = (item: MenuItem) => {
+    setItems(list => list.map(i => i.id === item.id ? item : i));
+  };
+
+  const handleFeaturedChange = async (nextId: number | null) => {
+    if (!token) return;
+    setSavingFeatured(true);
+    const prev = featuredDrinkId;
+    setFeaturedDrinkId(nextId);  // optimistic
+    try {
+      await adminApi.menu.setFeaturedDrink(token, nextId);
+      showMsg("success", nextId ? "Spotlight drink updated" : "Spotlight cleared");
+      revalidate(["/"]);
+    } catch (e) {
+      setFeaturedDrinkId(prev);
+      showMsg("error", e instanceof Error ? e.message : "Couldn’t update spotlight");
+    } finally {
+      setSavingFeatured(false);
+    }
+  };
+
   const handleCatSaved = (cat: MenuCategory) => {
     setCategories(list => list.map(c => c.id === cat.id ? cat : c));
     setCatDrawer(null);
@@ -131,6 +182,14 @@ export default function AdminMenuPage() {
             Add Item
           </Button>
         }
+      />
+
+      {/* Home-page spotlight drink */}
+      <FeaturedDrinkCard
+        items={items}
+        featuredDrinkId={featuredDrinkId}
+        saving={savingFeatured}
+        onChange={handleFeaturedChange}
       />
 
       {/* Categories */}
@@ -311,6 +370,7 @@ export default function AdminMenuPage() {
           defaultCategoryId={activeCat === "all" ? categories[0]?.id ?? 0 : activeCat}
           onClose={() => setItemDrawer(null)}
           onSaved={handleItemSaved}
+          onAutoSaved={handleItemAutoSaved}
           onError={msg => showMsg("error", msg)}
         />
       )}
@@ -345,9 +405,11 @@ export default function AdminMenuPage() {
 /*  Item Drawer                                                             */
 /* ──────────────────────────────────────────────────────────────────────── */
 
+type AutoSaveStatus = "idle" | "unsaved" | "saving" | "saved" | "error";
+
 function ItemDrawer({
   mode, item, categories, items, defaultCategoryId,
-  onClose, onSaved, onError,
+  onClose, onSaved, onAutoSaved, onError,
 }: {
   mode: "create" | "edit";
   item?: MenuItem;
@@ -356,6 +418,7 @@ function ItemDrawer({
   defaultCategoryId: number;
   onClose: () => void;
   onSaved: (item: MenuItem, isNew: boolean) => void;
+  onAutoSaved: (item: MenuItem) => void;
   onError: (msg: string) => void;
 }) {
   const [form, setForm] = useState<ItemForm>(
@@ -371,6 +434,18 @@ function ItemDrawer({
     } : emptyItemForm()
   );
   const [categoryId, setCategoryId] = useState<number>(item?.menu_category_id ?? defaultCategoryId);
+
+  // Local form state for size variants. Empty array means "no sizes — drink uses single price".
+  const [variants, setVariants] = useState<VariantRow[]>(
+    () => (item?.variants ?? []).map(v => ({
+      id: v.id,
+      size_label: v.size_label,
+      price: String(v.price),
+      sort_order: v.sort_order ?? 0,
+      is_active: v.is_active ?? true,
+    }))
+  );
+
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [removeImage, setRemoveImage] = useState(false);
@@ -378,12 +453,160 @@ function ItemDrawer({
   const [err, setErr] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // ── Auto-save state (edit mode only) ─────────────────────────────────────
+  const isEditing = !!item;
+  const [autoStatus, setAutoStatus] = useState<AutoSaveStatus>("idle");
+  const [autoSavedAt, setAutoSavedAt] = useState<Date | null>(null);
+  const savedSnapshotRef = useRef<string | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inFlightRef = useRef<boolean>(false);
+
+  // Snapshot of fields that participate in auto-save (image is handled separately).
+  // Variants are serialized WITHOUT ids — id hydration after a save shouldn't
+  // be seen as a user-meaningful change (otherwise we'd auto-save in a loop).
+  const buildSnapshot = useCallback(
+    () => JSON.stringify({
+      ...form,
+      categoryId,
+      variants: variants.map(v => ({
+        size_label: v.size_label.trim(),
+        price: v.price,
+        is_active: v.is_active,
+      })),
+    }),
+    [form, categoryId, variants],
+  );
+
   useEffect(() => {
     if (!imageFile) { setImagePreviewUrl(null); return; }
     const url = URL.createObjectURL(imageFile);
     setImagePreviewUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [imageFile]);
+
+  // Initialize the saved snapshot once on mount for edit mode.
+  useEffect(() => {
+    if (!isEditing) return;
+    savedSnapshotRef.current = buildSnapshot();
+    setAutoStatus("saved");
+    setAutoSavedAt(new Date());
+    // run-once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Schedule debounced auto-save when form/categoryId/variants change (edit mode only).
+  useEffect(() => {
+    if (!isEditing || !item) return;
+    if (savedSnapshotRef.current === null) return;
+    const next = buildSnapshot();
+    if (next === savedSnapshotRef.current) return;
+
+    setAutoStatus("unsaved");
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => { void runAutoSave(); }, 800);
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, categoryId, variants]);
+
+  // Warn on unload if there are unsaved changes (text or image).
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      const hasUnsavedImage = !!imageFile || removeImage;
+      if (autoStatus === "unsaved" || autoStatus === "saving" || hasUnsavedImage) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [autoStatus, imageFile, removeImage]);
+
+  const runAutoSave = useCallback(async (): Promise<boolean> => {
+    const token = getToken();
+    if (!token || !item) return false;
+    if (inFlightRef.current) return false;
+
+    // Skip if validation would fail — surface inline so user can see why.
+    if (!form.name.trim() || !form.price) {
+      setAutoStatus("error");
+      setErr("Name and price are required.");
+      return false;
+    }
+
+    inFlightRef.current = true;
+    setAutoStatus("saving");
+    setErr(null);
+    try {
+      const payload = {
+        menu_category_id: categoryId,
+        name: form.name.trim(),
+        name_es: form.name_es.trim() || null,
+        description: form.description,
+        description_es: form.description_es || null,
+        price: parseFloat(form.price) as unknown as never,
+        is_featured: form.is_featured,
+        is_seasonal: form.is_seasonal,
+        is_active: form.is_active,
+        variants: buildVariantPayload(variants) as unknown as never,
+      };
+      // 10-second hard ceiling so a stalled network never leaves the pill spinning.
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Save timed out — check your connection and retry.")), 10_000),
+      );
+      const saved = await Promise.race([
+        adminApi.menu.updateItem(token, item.id, payload),
+        timeout,
+      ]);
+      // Re-hydrate local variant rows with server-assigned ids so the next sync
+      // updates rather than re-creating.
+      if (saved.variants) {
+        setVariants(saved.variants.map(v => ({
+          id: v.id,
+          size_label: v.size_label,
+          price: String(v.price),
+          sort_order: v.sort_order ?? 0,
+          is_active: v.is_active ?? true,
+        })));
+      }
+      savedSnapshotRef.current = buildSnapshot();
+      setAutoStatus("saved");
+      setAutoSavedAt(new Date());
+      everSavedRef.current = true;
+      onAutoSaved(saved);
+      return true;
+    } catch (e) {
+      setAutoStatus("error");
+      setErr(e instanceof Error ? e.message : "Could not save");
+      return false;
+    } finally {
+      inFlightRef.current = false;
+    }
+  }, [item, form, categoryId, variants, buildSnapshot, onAutoSaved]);
+
+  // Flush any pending auto-save before closing, then revalidate public pages
+  // once (instead of revalidating on every keystroke).
+  // everSavedRef flips true only on an actual save event (not on mount).
+  const everSavedRef = useRef<boolean>(false);
+
+  const handleClose = useCallback(async () => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (isEditing && autoStatus === "unsaved") {
+      const ok = await runAutoSave();
+      if (!ok) {
+        const force = confirm(
+          "Could not auto-save your changes. Close anyway and lose unsaved edits?",
+        );
+        if (!force) return;
+      }
+    }
+    if (isEditing && everSavedRef.current) {
+      void revalidate(["/menu", "/"]);
+    }
+    onClose();
+  }, [autoStatus, isEditing, runAutoSave, onClose]);
 
   const otherSeasonalCount = items.filter(i => i.is_seasonal && i.id !== item?.id).length;
   const seasonalAtLimit = otherSeasonalCount >= 2 && !form.is_seasonal;
@@ -396,8 +619,10 @@ function ItemDrawer({
     if (!form.name.trim() || !form.price) { setErr("Name and price are required."); return; }
     setErr(null);
     setSaving(true);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     try {
       const payload = {
+        menu_category_id: categoryId,
         name: form.name.trim(),
         name_es: form.name_es.trim() || null,
         description: form.description,
@@ -406,14 +631,27 @@ function ItemDrawer({
         is_featured: form.is_featured,
         is_seasonal: form.is_seasonal,
         is_active: form.is_active,
+        variants: buildVariantPayload(variants) as unknown as never,
       };
 
       let saved: MenuItem;
       if (item) {
         const updateData = removeImage ? { ...payload, image_url: null as unknown as never } : payload;
         saved = await adminApi.menu.updateItem(token, item.id, updateData);
+        if (saved.variants) {
+          setVariants(saved.variants.map(v => ({
+            id: v.id,
+            size_label: v.size_label,
+            price: String(v.price),
+            sort_order: v.sort_order ?? 0,
+            is_active: v.is_active ?? true,
+          })));
+        }
+        savedSnapshotRef.current = buildSnapshot();
+        setAutoStatus("saved");
+        setAutoSavedAt(new Date());
       } else {
-        saved = await adminApi.menu.createItem(token, { menu_category_id: categoryId, ...payload });
+        saved = await adminApi.menu.createItem(token, payload);
       }
 
       if (imageFile && saved.id) {
@@ -422,6 +660,7 @@ function ItemDrawer({
 
       onSaved(saved, !item);
     } catch (e) {
+      setAutoStatus("error");
       onError(e instanceof Error ? e.message : "Could not save");
     } finally {
       setSaving(false);
@@ -431,14 +670,18 @@ function ItemDrawer({
   return (
     <FormDrawer
       open
-      onClose={onClose}
+      onClose={handleClose}
       title={mode === "create" ? "New menu item" : "Edit menu item"}
       description={item?.name}
       size="md"
       footer={
         <>
-          <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button variant="primary" onClick={handleSave} loading={saving}>Save</Button>
+          <Button variant="secondary" onClick={handleClose} disabled={saving}>
+            {isEditing ? "Close" : "Cancel"}
+          </Button>
+          <Button variant="primary" onClick={handleSave} loading={saving}>
+            {isEditing ? (imageFile || removeImage ? "Save image & close" : "Save & close") : "Save"}
+          </Button>
         </>
       }
     >
@@ -450,6 +693,14 @@ function ItemDrawer({
           >
             {err}
           </div>
+        )}
+
+        {isEditing && (
+          <AutoSaveStatusPill
+            status={autoStatus}
+            savedAt={autoSavedAt}
+            onRetry={() => { void runAutoSave(); }}
+          />
         )}
 
         {/* Image */}
@@ -524,7 +775,6 @@ function ItemDrawer({
             className="admin-select"
             value={categoryId}
             onChange={e => setCategoryId(Number(e.target.value))}
-            disabled={!!item}
           >
             {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
@@ -580,7 +830,9 @@ function ItemDrawer({
 
         {/* Price */}
         <div>
-          <label className="admin-label">Price ($)</label>
+          <label className="admin-label">
+            Price ($){variants.length > 0 ? <span className="ml-2 font-normal" style={{ color: "var(--admin-ink-muted)" }}>· default size — sizes below override on the menu</span> : null}
+          </label>
           <input
             className="admin-input"
             type="number"
@@ -590,6 +842,13 @@ function ItemDrawer({
             onChange={e => setForm(f => ({ ...f, price: e.target.value }))}
           />
         </div>
+
+        {/* Sizes / variants */}
+        <VariantEditor
+          rows={variants}
+          onChange={setVariants}
+          defaultPrice={form.price}
+        />
 
         {/* Toggles */}
         <div
@@ -709,6 +968,279 @@ function CategoryDrawer({
         </div>
       </div>
     </FormDrawer>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────── */
+/*  Featured drink card (home-page spotlight)                               */
+/* ──────────────────────────────────────────────────────────────────────── */
+
+function FeaturedDrinkCard({
+  items, featuredDrinkId, saving, onChange,
+}: {
+  items: MenuItem[];
+  featuredDrinkId: number | null;
+  saving: boolean;
+  onChange: (id: number | null) => void;
+}) {
+  const activeItems = items.filter(i => i.is_active);
+  const current = items.find(i => i.id === featuredDrinkId) ?? null;
+
+  return (
+    <Card padding="none">
+      <div className="px-5 py-4 flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
+          <ItemImage
+            name={current?.name ?? "Spotlight"}
+            imageUrl={current?.image_url ?? null}
+            size={48}
+          />
+          <div className="min-w-0">
+            <p className="text-sm font-semibold" style={{ color: "var(--admin-ink)" }}>
+              Home-page spotlight drink
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: "var(--admin-ink-muted)" }}>
+              {current
+                ? <>Currently promoting <span style={{ color: "var(--admin-ink)" }}>{current.name}</span> on the public home page.</>
+                : "No drink selected — the home page falls back to the default hero."}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <select
+            className="admin-select"
+            value={featuredDrinkId ?? ""}
+            disabled={saving || activeItems.length === 0}
+            onChange={e => {
+              const v = e.target.value;
+              onChange(v === "" ? null : Number(v));
+            }}
+            style={{ minWidth: 220 }}
+          >
+            <option value="">— none —</option>
+            {activeItems.map(i => (
+              <option key={i.id} value={i.id}>{i.name}</option>
+            ))}
+          </select>
+          {featuredDrinkId !== null && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => onChange(null)}
+              disabled={saving}
+            >
+              Clear
+            </Button>
+          )}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────── */
+/*  Variant (size & price) editor                                           */
+/* ──────────────────────────────────────────────────────────────────────── */
+
+function VariantEditor({
+  rows, onChange, defaultPrice,
+}: {
+  rows: VariantRow[];
+  onChange: (next: VariantRow[]) => void;
+  defaultPrice: string;
+}) {
+  const update = (index: number, patch: Partial<VariantRow>) => {
+    onChange(rows.map((r, i) => (i === index ? { ...r, ...patch } : r)));
+  };
+
+  const remove = (index: number) => {
+    onChange(rows.filter((_, i) => i !== index));
+  };
+
+  const move = (index: number, dir: -1 | 1) => {
+    const target = index + dir;
+    if (target < 0 || target >= rows.length) return;
+    const next = [...rows];
+    [next[index], next[target]] = [next[target], next[index]];
+    onChange(next);
+  };
+
+  const add = () => {
+    // Suggest a sensible default label and the existing default price
+    const suggested =
+      rows.length === 0 ? "12 oz"
+      : rows.length === 1 ? "16 oz"
+      : "";
+    onChange([
+      ...rows,
+      {
+        size_label: suggested,
+        price: defaultPrice || "",
+        sort_order: rows.length,
+        is_active: true,
+      },
+    ]);
+  };
+
+  return (
+    <div
+      className="p-4 rounded-lg flex flex-col gap-3"
+      style={{ background: "var(--admin-surface-alt)", border: "1px solid var(--admin-border)" }}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <p className="text-sm font-semibold" style={{ color: "var(--admin-ink)" }}>
+            Sizes &amp; prices
+          </p>
+          <p className="text-xs" style={{ color: "var(--admin-ink-muted)" }}>
+            {rows.length === 0
+              ? "Optional — leave empty to use a single price."
+              : "Customers will see one card per drink with these sizes as options."}
+          </p>
+        </div>
+        <Button variant="secondary" size="sm" onClick={add}>
+          + Add size
+        </Button>
+      </div>
+
+      {rows.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {rows.map((row, i) => (
+            <div
+              key={row.id ?? `new-${i}`}
+              className="flex items-center gap-2 p-2 rounded-md"
+              style={{ background: "var(--admin-surface)", border: "1px solid var(--admin-border)" }}
+            >
+              <input
+                className="admin-input"
+                style={{ flex: "1 1 0", minWidth: 0 }}
+                value={row.size_label}
+                placeholder="e.g. 12 oz"
+                onChange={e => update(i, { size_label: e.target.value })}
+                aria-label="Size label"
+              />
+              <div className="flex items-center gap-1" style={{ width: 110 }}>
+                <span className="text-xs" style={{ color: "var(--admin-ink-muted)" }}>$</span>
+                <input
+                  className="admin-input"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={row.price}
+                  placeholder="0.00"
+                  onChange={e => update(i, { price: e.target.value })}
+                  aria-label="Price"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => move(i, -1)}
+                disabled={i === 0}
+                className="p-1.5 rounded-md disabled:opacity-30"
+                style={{ color: "var(--admin-ink-muted)" }}
+                title="Move up"
+                aria-label="Move up"
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                onClick={() => move(i, 1)}
+                disabled={i === rows.length - 1}
+                className="p-1.5 rounded-md disabled:opacity-30"
+                style={{ color: "var(--admin-ink-muted)" }}
+                title="Move down"
+                aria-label="Move down"
+              >
+                ↓
+              </button>
+              <button
+                type="button"
+                onClick={() => remove(i)}
+                className="p-1.5 rounded-md"
+                style={{ color: "var(--admin-danger)" }}
+                title="Remove size"
+                aria-label="Remove size"
+              >
+                <IconTrash size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────── */
+/*  Auto-save status pill                                                   */
+/* ──────────────────────────────────────────────────────────────────────── */
+
+function AutoSaveStatusPill({
+  status, savedAt, onRetry,
+}: {
+  status: AutoSaveStatus;
+  savedAt: Date | null;
+  onRetry: () => void;
+}) {
+  const timeStr = savedAt
+    ? savedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    : null;
+
+  const tone = (() => {
+    switch (status) {
+      case "saving":   return { bg: "var(--admin-surface-alt)", fg: "var(--admin-ink-muted)" };
+      case "saved":    return { bg: "var(--admin-success-bg)",  fg: "var(--admin-success)"   };
+      case "unsaved":  return { bg: "var(--admin-surface-alt)", fg: "var(--admin-ink-muted)" };
+      case "error":    return { bg: "var(--admin-danger-bg)",   fg: "var(--admin-danger)"    };
+      default:         return { bg: "var(--admin-surface-alt)", fg: "var(--admin-ink-muted)" };
+    }
+  })();
+
+  const label = (() => {
+    switch (status) {
+      case "saving":  return "Saving…";
+      case "saved":   return timeStr ? `Saved · ${timeStr}` : "Saved";
+      case "unsaved": return "Unsaved changes";
+      case "error":   return "Couldn’t save — retry";
+      default:        return "Ready";
+    }
+  })();
+
+  return (
+    <div
+      className="px-3 py-2 rounded-md text-xs flex items-center justify-between gap-2"
+      style={{ background: tone.bg, color: tone.fg }}
+      role="status"
+      aria-live="polite"
+    >
+      <span className="flex items-center gap-2">
+        <span
+          className="inline-block rounded-full"
+          style={{
+            width: 8, height: 8,
+            background: status === "saved" ? "currentColor"
+                      : status === "saving" ? "currentColor"
+                      : status === "error" ? "currentColor"
+                      : "transparent",
+            border: status === "unsaved" ? "1.5px solid currentColor" : "none",
+            opacity: status === "saving" ? 0.7 : 1,
+          }}
+          aria-hidden
+        />
+        {label}
+      </span>
+      {status === "error" && (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="text-xs font-semibold underline"
+          style={{ color: "currentColor" }}
+        >
+          Retry
+        </button>
+      )}
+    </div>
   );
 }
 

@@ -1,5 +1,5 @@
 import PublicNav from "@/components/layout/PublicNav";
-import { HeroSection, SeasonalSection, StampSection, PillarsSection, HomeFooter, type PillarCms } from "./HomeContent";
+import { HeroSection, SpotlightSection, SeasonalSection, StampSection, PillarsSection, HomeFooter, type PillarCms } from "./HomeContent";
 import { optimized } from "@/lib/cloudinary";
 import type { PageContent, MenuItem } from "@/lib/api";
 
@@ -15,11 +15,13 @@ export default async function HomePage() {
   let cmsHeading:    string | null = null;
   let cmsSubtext:    string | null = null;
   let seasonalItems: MenuItem[] = [];
+  let promotionalItem: MenuItem | null = null;
   let cmsPillars: [PillarCms, PillarCms, PillarCms] | undefined;
   try {
-    const [cmsRes, seasonalRes] = await Promise.all([
+    const [cmsRes, seasonalRes, promoRes] = await Promise.all([
       fetch(`${BASE}/page-contents/home`, { next: { revalidate: 300 }, headers: { Accept: "application/json" } }),
       fetch(`${BASE}/menu/seasonal`,       { next: { revalidate: 300 }, headers: { Accept: "application/json" } }),
+      fetch(`${BASE}/menu/promotional`,    { next: { revalidate: 300 }, headers: { Accept: "application/json" } }),
     ]);
     if (cmsRes.ok) {
       const data: PageContent = await cmsRes.json();
@@ -40,6 +42,11 @@ export default async function HomePage() {
       }
     }
     if (seasonalRes.ok) seasonalItems = await seasonalRes.json();
+    if (promoRes.ok) {
+      // Endpoint returns null when no spotlight is configured.
+      const body = await promoRes.json();
+      promotionalItem = body && typeof body === "object" ? body as MenuItem : null;
+    }
   } catch { /* render with nulls → client uses translation fallbacks */ }
 
   const heroImageOptimized = heroImageUrl
@@ -56,6 +63,9 @@ export default async function HomePage() {
         cmsHeading={cmsHeading}
         cmsSubtext={cmsSubtext}
       />
+
+      {/* ── Single hand-picked spotlight drink (admin-controlled, optional) ── */}
+      {promotionalItem && <SpotlightSection item={promotionalItem} />}
 
       {/* ── Seasonal drinks promotion (hidden when none are toggled) ── */}
       {seasonalItems.length > 0 && <SeasonalSection items={seasonalItems} />}

@@ -245,6 +245,94 @@ function DefaultHero({ heroImageUrl, cmsHeading, cmsSubtext }: HeroSectionProps)
   );
 }
 
+// ── Spotlight (single hand-picked promotional drink) ─────────────────────────
+// Admin-controlled via /admin/menu → "Home-page spotlight". Renders a polished
+// hero card with image, name, description, price, and a CTA to the menu.
+// Falls back gracefully (component is not rendered at all) when no spotlight
+// is configured — the page above just skips it.
+export function SpotlightSection({ item }: { item: MenuItem }) {
+  const { lang, strings } = useLang();
+  const variants = item.active_variants ?? item.variants ?? [];
+  const name = (lang === "es" && item.name_es) ? item.name_es : item.name;
+  const description = (lang === "es" && item.description_es) ? item.description_es : item.description;
+  // Use the first (admin-ordered) variant as the headline price when sizes exist,
+  // so admins control which size is featured rather than always showing the cheapest.
+  const priceNum = variants.length > 0
+    ? Number.parseFloat(variants[0].price)
+    : Number.parseFloat(item.price);
+  const priceLabel = `$${priceNum.toFixed(2)}`;
+
+  return (
+    <section className="px-6 pt-20 pb-6">
+      <div className="max-w-3xl mx-auto">
+        <div
+          className="kc-card kc-lift overflow-hidden"
+          style={{
+            background: "linear-gradient(135deg, #fff 0%, var(--kc-cream) 100%)",
+            border: "1.5px solid var(--kc-gold-lt)",
+            display: "grid",
+            gridTemplateColumns: "minmax(0, 1fr)",
+          }}
+        >
+          <div
+            className="grid items-center gap-6 p-6 sm:p-8"
+            style={{ gridTemplateColumns: "minmax(120px, 200px) minmax(0, 1fr)" }}
+          >
+            {/* Image */}
+            <div className="flex items-center justify-center">
+              <ItemImage name={name} imageUrl={item.image_url} size={180} />
+            </div>
+
+            {/* Content */}
+            <div className="min-w-0 flex flex-col gap-3">
+              <span
+                className="kc-badge"
+                style={{
+                  background: "linear-gradient(135deg, #f0dcaa 0%, #d4a84b 100%)",
+                  color: "#fff",
+                  fontSize: "0.6875rem",
+                  padding: "0.2rem 0.85rem",
+                  display: "inline-flex",
+                  alignSelf: "flex-start",
+                  boxShadow: "0 2px 8px rgba(184,150,46,0.25)",
+                }}
+              >
+                ✦ {strings.home.spotlightBadge}
+              </span>
+              <h2
+                className="font-bold leading-tight"
+                style={{
+                  fontFamily: "var(--font-script)",
+                  fontSize: "clamp(1.5rem, 4vw, 2.25rem)",
+                  color: "var(--kc-blue-deep)",
+                }}
+              >
+                {name}
+              </h2>
+              {description && (
+                <p
+                  className="text-sm sm:text-base"
+                  style={{ color: "var(--kc-muted)", lineHeight: 1.7, maxWidth: "52ch" }}
+                >
+                  {description}
+                </p>
+              )}
+              <div className="flex items-center justify-between gap-3 mt-2 flex-wrap">
+                <p className="font-bold" style={{ fontSize: "1.05rem", color: "var(--kc-gold)" }}>
+                  {priceLabel}
+                </p>
+                <Link href="/menu" className="kc-btn kc-btn-gold kc-btn-sm">
+                  {strings.home.spotlightCta}
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 // ── Seasonal drinks promotion ─────────────────────────────────────────────────
 export function SeasonalSection({ items }: { items: MenuItem[] }) {
   const { lang, strings } = useLang();

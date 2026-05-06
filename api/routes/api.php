@@ -49,6 +49,7 @@ Route::prefix('v1')->group(function () {
         Route::get('/items/{item}', [MenuController::class, 'show']);
         Route::get('/featured',     [MenuController::class, 'featured']);
         Route::get('/seasonal',     [MenuController::class, 'seasonal']);
+        Route::get('/promotional',  [MenuController::class, 'promotional']);
     });
 
     // ── Public Page Content ────────────────────────────────────────────────
@@ -86,6 +87,8 @@ Route::prefix('v1')->group(function () {
                 ->middleware('throttle:20,1');
 
             Route::prefix('menu')->group(function () {
+                Route::get ('/featured-drink', [MenuItemController::class, 'featuredShow']);
+                Route::put ('/featured-drink', [MenuItemController::class, 'featuredUpdate']);
                 Route::apiResource('/categories', MenuCategoryController::class);
                 Route::apiResource('/items',      MenuItemController::class);
                 Route::post('/items/{menuItem}/image', [MenuItemController::class, 'uploadImage']);

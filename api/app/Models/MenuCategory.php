@@ -35,6 +35,9 @@ class MenuCategory extends Model
 
     public function active_items(): HasMany
     {
-        return $this->hasMany(MenuItem::class)->where('is_active', true)->orderBy('sort_order');
+        return $this->hasMany(MenuItem::class)
+            ->where('is_active', true)
+            ->with(['activeVariants'])
+            ->orderBy('sort_order');
     }
 }

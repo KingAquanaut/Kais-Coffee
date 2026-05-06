@@ -198,6 +198,7 @@ export default function AdminAboutPage() {
     if (hasPhoto && token) {
       try {
         await adminApi.pageContent.removeImageByKey(token, "about", `team_member_${n}_photo`);
+        await revalidate(["/about"]);
       } catch { /* image removal failed — UI already cleared, will retry on next save */ }
     }
     showMsg("success", "Team member cleared (remember to Save)");
@@ -789,11 +790,13 @@ function TeamMemberDrawer({
         const updated = await adminApi.pageContent.removeImageByKey(token, "about", key);
         onPhotoUploaded(updated[`team_member_${slot}_photo_url`] ?? "");
         setRemovePhoto(false);
+        await revalidate(["/about"]);
       } else if (photoFile) {
         const updated = await adminApi.pageContent.uploadImageByKey(token, "about", key, photoFile);
         onPhotoUploaded(updated[`team_member_${slot}_photo_url`] ?? "");
         setPhotoFile(null);
         if (fileRef.current) fileRef.current.value = "";
+        await revalidate(["/about"]);
       }
     } catch (e) {
       onError(e instanceof Error ? e.message : "Could not save photo");
@@ -900,7 +903,7 @@ function TeamMemberDrawer({
                 </Button>
               </div>
               <p className="text-xs" style={{ color: "var(--admin-ink-muted)" }}>
-                Square crop recommended · max 20 MB
+                Portrait orientation works best (4:5). The face is auto-centered. JPEG, PNG or WebP · max 20 MB.
               </p>
             </div>
           </div>

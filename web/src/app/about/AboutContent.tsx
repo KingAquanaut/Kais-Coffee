@@ -43,16 +43,26 @@ function SectionBody({ children }: { children: React.ReactNode }) {
 }
 
 function BaristaCard({ name, role, photoUrl }: { name: string; role: string; photoUrl?: string | null }) {
+  // Portrait aspect (4:5) gives faces more vertical headroom than a square crop —
+  // important when admins upload natural portrait photos. Cloudinary g_face still
+  // anchors the crop to the detected face center.
+  const initials = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(p => p.charAt(0).toUpperCase())
+    .join("") || "—";
+
   return (
     <div
       className="kc-card kc-team-card overflow-hidden"
-      style={{ position: "relative", aspectRatio: "1 / 1" }}
+      style={{ position: "relative", aspectRatio: "4 / 5" }}
     >
       {photoUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={optimized(photoUrl, "f_auto,q_auto,c_fill,w_400,h_400,g_face")!}
-          alt={name}
+          src={optimized(photoUrl, "f_auto,q_auto,c_fill,w_480,h_600,g_face")!}
+          alt={`Photo of ${name}, ${role}`}
           className="kc-team-img"
           style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
         />
@@ -61,28 +71,65 @@ function BaristaCard({ name, role, photoUrl }: { name: string; role: string; pho
           className="kc-team-img"
           style={{
             position: "absolute", inset: 0,
-            background: "linear-gradient(145deg, #e8f2fa 0%, #bcd8ed 100%)",
+            background: "linear-gradient(160deg, #e8f2fa 0%, #bcd8ed 60%, #97c0dd 100%)",
             display: "flex", alignItems: "center", justifyContent: "center",
           }}
+          aria-hidden="true"
         >
-          <svg width="56" height="56" viewBox="0 0 40 40" fill="none" aria-hidden="true" style={{ opacity: 0.4 }}>
-            <circle cx="20" cy="14" r="7" stroke="#3a7ca5" strokeWidth="2" fill="rgba(58,124,165,0.12)" />
-            <path d="M5 36c0-8.284 6.716-15 15-15s15 6.716 15 15" stroke="#3a7ca5" strokeWidth="2" strokeLinecap="round" fill="none" />
-          </svg>
+          <span
+            style={{
+              fontFamily: "var(--font-heading)",
+              fontWeight: 700,
+              fontSize: "clamp(2.5rem, 7vw, 3.5rem)",
+              color: "rgba(58,124,165,0.55)",
+              letterSpacing: "0.02em",
+            }}
+          >
+            {initials}
+          </span>
         </div>
       )}
+
+      {/* Subtle radial vignette to make text legible without flattening the photo */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute", inset: 0, zIndex: 1,
+          background:
+            "linear-gradient(to top, rgba(10,15,25,0.78) 0%, rgba(10,15,25,0.42) 35%, rgba(10,15,25,0.10) 60%, transparent 80%)",
+        }}
+      />
+
       <div
         style={{
           position: "absolute", bottom: 0, left: 0, right: 0,
-          background: "linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.28) 60%, transparent 100%)",
-          padding: "1.5rem 1rem 1rem",
-          zIndex: 1,
+          padding: "1.25rem 1.1rem 1.1rem",
+          zIndex: 2,
         }}
       >
-        <p className="font-bold leading-tight" style={{ fontFamily: "var(--font-heading)", fontSize: "1.1rem", color: "#fff" }}>
+        <p
+          className="font-bold leading-tight"
+          style={{
+            fontFamily: "var(--font-script)",
+            fontSize: "clamp(1.1rem, 2.2vw, 1.35rem)",
+            color: "#fff",
+            letterSpacing: "0.005em",
+          }}
+        >
           {name}
         </p>
-        <p className="mt-0.5 text-sm" style={{ color: "rgba(255,255,255,0.78)" }}>{role}</p>
+        <p
+          className="mt-1"
+          style={{
+            color: "rgba(255,255,255,0.85)",
+            fontSize: "0.75rem",
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            fontWeight: 600,
+          }}
+        >
+          {role}
+        </p>
       </div>
     </div>
   );
