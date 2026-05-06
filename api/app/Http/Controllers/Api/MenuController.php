@@ -61,21 +61,26 @@ class MenuController extends Controller
 
     /**
      * Single hand-picked promotional drink for the home-page hero spotlight.
-     * Always returns {item: MenuItem|null} so consumers don't have to discriminate
-     * between an absent body and an empty body.
+     * Always returns {item: MenuItem|null, label: string|null} so consumers
+     * don't have to discriminate between absent and empty bodies. label is the
+     * admin-edited badge ("Drink of the Moment" by default) or null when unset.
      */
     public function promotional(): JsonResponse
     {
-        $id = \App\Models\Setting::get('featured_menu_item_id');
-        if (! $id) {
-            return response()->json(['item' => null]);
+        $id    = \App\Models\Setting::get('featured_menu_item_id');
+        $label = \App\Models\Setting::get('featured_drink_label');
+
+        $item = null;
+        if ($id) {
+            $item = MenuItem::where('id', $id)
+                ->where('is_active', true)
+                ->with(['category:id,name,slug', 'activeVariants'])
+                ->first();
         }
 
-        $item = MenuItem::where('id', $id)
-            ->where('is_active', true)
-            ->with(['category:id,name,slug', 'activeVariants'])
-            ->first();
-
-        return response()->json(['item' => $item]);
+        return response()->json([
+            'item'  => $item,
+            'label' => $label !== '' ? $label : null,
+        ]);
     }
 }

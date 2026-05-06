@@ -33,11 +33,16 @@ function MenuTile({ item }: { item: MenuItem }) {
     if (hasDescription) setFlipped(f => !f);
   }, [hasDescription]);
 
+  // Card height is fixed because the front/back panes use position:absolute
+  // (required by the 3-D flip transform). When size pills are present we need
+  // ~32 extra px so they don't get clipped by the front pane's overflow:hidden.
+  const cardHeight = variants.length > 0 ? 252 : 220;
+
   return (
     <div
       className={`kc-flip-card${flipped ? " is-flipped" : ""}`}
       onClick={toggle}
-      style={{ height: 220 }}
+      style={{ height: cardHeight }}
     >
       {/* Smoke wisps — visible on hover */}
       {hasDescription && (
@@ -118,6 +123,9 @@ function MenuTile({ item }: { item: MenuItem }) {
 }
 
 // ── Size pills (12oz / 16oz) — only rendered when item has variants ─────────
+// Pill button uses an explicit line-height so vertical padding renders the
+// same on every browser; the wrapper's pb-1 keeps the focus ring clear of
+// the parent's overflow:hidden boundary on iOS Safari.
 function SizePills({
   variants, activeId, onSelect,
 }: {
@@ -126,7 +134,7 @@ function SizePills({
   onSelect: (id: number) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-center gap-1.5 mt-1">
+    <div className="flex flex-wrap items-center justify-center gap-1.5 mt-1.5 pb-1">
       {variants.map(v => {
         const active = v.id === activeId;
         return (
@@ -134,8 +142,10 @@ function SizePills({
             key={v.id}
             type="button"
             onClick={e => { e.stopPropagation(); onSelect(v.id); }}
-            className="px-2.5 py-0.5 rounded-full text-[0.7rem] font-semibold transition-colors"
+            className="rounded-full text-[0.7rem] font-semibold transition-colors"
             style={{
+              padding: "3px 10px",
+              lineHeight: 1.4,
               background: active ? "var(--kc-blue-deep)" : "rgba(255,255,255,0.85)",
               color: active ? "#fff" : "var(--kc-blue-deep)",
               border: "1px solid var(--kc-blue-deep)",

@@ -16,6 +16,12 @@ use Illuminate\Support\Str; // used for slug generation
  */
 const FEATURED_DRINK_SETTING_KEY = 'featured_menu_item_id';
 
+/**
+ * Setting key for the spotlight section's badge/label. Null/empty means the
+ * frontend falls back to the localized default ("Drink of the Moment").
+ */
+const FEATURED_DRINK_LABEL_KEY = 'featured_drink_label';
+
 class MenuItemController extends Controller
 {
     /**
@@ -177,40 +183,63 @@ class MenuItemController extends Controller
     }
 
     /**
-     * Return the currently configured home-page spotlight drink (or null).
+     * Return the currently configured home-page spotlight drink (or null) and
+     * the admin-controlled label/badge that appears above the drink name.
      */
     public function featuredShow(): JsonResponse
     {
-        $id = Setting::get(FEATURED_DRINK_SETTING_KEY);
-        if (! $id) {
-            return response()->json(['menu_item_id' => null, 'item' => null]);
-        }
+        $id    = Setting::get(FEATURED_DRINK_SETTING_KEY);
+        $label = Setting::get(FEATURED_DRINK_LABEL_KEY);
 
-        $item = MenuItem::with(['category:id,name,slug', 'variants'])->find($id);
+        $item = $id
+            ? MenuItem::with(['category:id,name,slug', 'variants'])->find($id)
+            : null;
+
         return response()->json([
             'menu_item_id' => $item?->id,
             'item'         => $item,
+            'label'        => $label !== '' ? $label : null,
         ]);
     }
 
     /**
-     * Set or clear the home-page spotlight drink.
-     * Body: { menu_item_id: number|null }
+     * Set or clear the home-page spotlight drink and/or its label.
+     * Body: { menu_item_id?: number|null, label?: string|null }
+     * Both fields are optional and updated independently — sending only one
+     * doesn't disturb the other.
      */
     public function featuredUpdate(Request $request): JsonResponse
     {
         $data = $request->validate([
             'menu_item_id' => ['nullable', 'integer', 'exists:menu_items,id'],
+            'label'        => ['nullable', 'string', 'max:80'],
         ]);
 
-        Setting::updateOrCreate(
-            ['key' => FEATURED_DRINK_SETTING_KEY],
-            [
-                'value'       => $data['menu_item_id'] !== null ? (string) $data['menu_item_id'] : null,
-                'cast'        => 'int',
-                'description' => 'Home-page promotional drink (single spotlight). null = no spotlight.',
-            ],
-        );
+        if ($request->has('menu_item_id')) {
+            Setting::updateOrCreate(
+                ['key' => FEATURED_DRINK_SETTING_KEY],
+                [
+                    'value'       => $data['menu_item_id'] !== null ? (string) $data['menu_item_id'] : null,
+                    'cast'        => 'int',
+                    'description' => 'Home-page promotional drink (single spotlight). null = no spotlight.',
+                ],
+            );
+        }
+
+        if ($request->has('label')) {
+            $label = $data['label'] ?? null;
+            // Treat empty string as "cleared" so the frontend falls back to the
+            // localized default ("Drink of the Moment").
+            $label = ($label !== null && trim($label) !== '') ? trim($label) : null;
+            Setting::updateOrCreate(
+                ['key' => FEATURED_DRINK_LABEL_KEY],
+                [
+                    'value'       => $label,
+                    'cast'        => 'string',
+                    'description' => 'Label/badge shown above the home-page spotlight drink. null = use default translation.',
+                ],
+            );
+        }
 
         return $this->featuredShow();
     }

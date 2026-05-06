@@ -16,6 +16,7 @@ export default async function HomePage() {
   let cmsSubtext:    string | null = null;
   let seasonalItems: MenuItem[] = [];
   let promotionalItem: MenuItem | null = null;
+  let promotionalLabel: string | null = null;
   let cmsPillars: [PillarCms, PillarCms, PillarCms] | undefined;
   try {
     const [cmsRes, seasonalRes, promoRes] = await Promise.all([
@@ -43,9 +44,10 @@ export default async function HomePage() {
     }
     if (seasonalRes.ok) seasonalItems = await seasonalRes.json();
     if (promoRes.ok) {
-      // Endpoint always returns { item: MenuItem | null }.
-      const body = await promoRes.json() as { item: MenuItem | null };
+      // Endpoint always returns { item: MenuItem | null, label: string | null }.
+      const body = await promoRes.json() as { item: MenuItem | null; label: string | null };
       promotionalItem = body?.item ?? null;
+      promotionalLabel = body?.label ?? null;
     }
   } catch { /* render with nulls → client uses translation fallbacks */ }
 
@@ -65,7 +67,7 @@ export default async function HomePage() {
       />
 
       {/* ── Single hand-picked spotlight drink (admin-controlled, optional) ── */}
-      {promotionalItem && <SpotlightSection item={promotionalItem} />}
+      {promotionalItem && <SpotlightSection item={promotionalItem} label={promotionalLabel} />}
 
       {/* ── Seasonal drinks promotion (hidden when none are toggled) ── */}
       {seasonalItems.length > 0 && <SeasonalSection items={seasonalItems} />}

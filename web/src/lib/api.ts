@@ -138,7 +138,7 @@ export const menu = {
   items: ()    => req<MenuItem[]>("/menu/items"),
   featured: () => req<MenuItem[]>("/menu/featured"),
   seasonal: () => req<MenuItem[]>("/menu/seasonal"),
-  promotional: () => req<{ item: MenuItem | null }>("/menu/promotional"),
+  promotional: () => req<{ item: MenuItem | null; label: string | null }>("/menu/promotional"),
 };
 
 // ── Account ────────────────────────────────────────────────────────────────
@@ -196,13 +196,18 @@ export const admin = {
       return upload<MenuItem>(`/admin/menu/items/${id}/image`, fd, token);
     },
     getFeaturedDrink: (token: string) =>
-      req<{ menu_item_id: number | null; item: MenuItem | null }>(
+      req<{ menu_item_id: number | null; item: MenuItem | null; label: string | null }>(
         "/admin/menu/featured-drink", { token },
       ),
     setFeaturedDrink: (token: string, menuItemId: number | null) =>
-      req<{ menu_item_id: number | null; item: MenuItem | null }>(
+      req<{ menu_item_id: number | null; item: MenuItem | null; label: string | null }>(
         "/admin/menu/featured-drink",
         { method: "PUT", body: { menu_item_id: menuItemId }, token },
+      ),
+    setFeaturedDrinkLabel: (token: string, label: string | null) =>
+      req<{ menu_item_id: number | null; item: MenuItem | null; label: string | null }>(
+        "/admin/menu/featured-drink",
+        { method: "PUT", body: { label }, token },
       ),
   },
   purchases: {
