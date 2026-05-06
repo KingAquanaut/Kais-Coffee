@@ -121,15 +121,15 @@ class MenuVariantsTest extends TestCase
 
         $res = $this->getJson('/api/v1/menu/promotional');
         $res->assertOk();
-        $res->assertJsonPath('id', $item->id);
-        $res->assertJsonPath('name', 'Spotlight Coffee');
+        $res->assertJsonPath('item.id', $item->id);
+        $res->assertJsonPath('item.name', 'Spotlight Coffee');
     }
 
     public function test_public_promotional_endpoint_returns_null_when_unset(): void
     {
         $res = $this->getJson('/api/v1/menu/promotional');
         $res->assertOk();
-        $this->assertNull($res->json());
+        $res->assertExactJson(['item' => null]);
     }
 
     public function test_admin_can_set_and_clear_featured_drink(): void

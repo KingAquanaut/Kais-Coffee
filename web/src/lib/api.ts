@@ -138,7 +138,7 @@ export const menu = {
   items: ()    => req<MenuItem[]>("/menu/items"),
   featured: () => req<MenuItem[]>("/menu/featured"),
   seasonal: () => req<MenuItem[]>("/menu/seasonal"),
-  promotional: () => req<MenuItem | null>("/menu/promotional"),
+  promotional: () => req<{ item: MenuItem | null }>("/menu/promotional"),
 };
 
 // ── Account ────────────────────────────────────────────────────────────────

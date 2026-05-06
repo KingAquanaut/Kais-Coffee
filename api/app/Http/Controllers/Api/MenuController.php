@@ -61,13 +61,14 @@ class MenuController extends Controller
 
     /**
      * Single hand-picked promotional drink for the home-page hero spotlight.
-     * Returns null when no featured drink is set or the configured item is gone/hidden.
+     * Always returns {item: MenuItem|null} so consumers don't have to discriminate
+     * between an absent body and an empty body.
      */
     public function promotional(): JsonResponse
     {
         $id = \App\Models\Setting::get('featured_menu_item_id');
         if (! $id) {
-            return response()->json(null);
+            return response()->json(['item' => null]);
         }
 
         $item = MenuItem::where('id', $id)
@@ -75,6 +76,6 @@ class MenuController extends Controller
             ->with(['category:id,name,slug', 'activeVariants'])
             ->first();
 
-        return response()->json($item);
+        return response()->json(['item' => $item]);
     }
 }

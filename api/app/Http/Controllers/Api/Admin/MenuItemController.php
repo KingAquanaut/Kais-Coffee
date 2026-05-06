@@ -110,12 +110,16 @@ class MenuItemController extends Controller
         );
     }
 
-    public function show(MenuItem $menuItem): JsonResponse
+    // Note: route-bound parameter is named $item because the apiResource route is
+    // /admin/menu/items/{item}. Laravel's implicit route-model binding matches by
+    // parameter NAME, so using $menuItem here would silently inject a fresh empty
+    // model instead of the bound row.
+    public function show(MenuItem $item): JsonResponse
     {
-        return response()->json($menuItem->load(['category:id,name,slug', 'variants']));
+        return response()->json($item->load(['category:id,name,slug', 'variants']));
     }
 
-    public function update(Request $request, MenuItem $menuItem): JsonResponse
+    public function update(Request $request, MenuItem $item): JsonResponse
     {
         $data = $request->validate(array_merge([
             'menu_category_id' => ['sometimes', 'exists:menu_categories,id'],
@@ -145,24 +149,24 @@ class MenuItemController extends Controller
             }
         }
 
-        $menuItem->update($data);
+        $item->update($data);
 
         if (is_array($variants)) {
-            $this->syncVariants($menuItem, $variants);
+            $this->syncVariants($item, $variants);
         }
 
-        $menuItem->refresh();
+        $item->refresh();
 
-        return response()->json($menuItem->load(['category:id,name,slug', 'variants']));
+        return response()->json($item->load(['category:id,name,slug', 'variants']));
     }
 
-    public function destroy(MenuItem $menuItem): JsonResponse
+    public function destroy(MenuItem $item): JsonResponse
     {
-        $menuItem->update(['is_active' => false]);
-        $menuItem->delete();
+        $item->update(['is_active' => false]);
+        $item->delete();
 
         // If the deleted item was the spotlight, clear the setting.
-        if ((int) Setting::get(FEATURED_DRINK_SETTING_KEY) === $menuItem->id) {
+        if ((int) Setting::get(FEATURED_DRINK_SETTING_KEY) === $item->id) {
             Setting::updateOrCreate(
                 ['key' => FEATURED_DRINK_SETTING_KEY],
                 ['value' => null],

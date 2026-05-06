@@ -34,12 +34,16 @@ class MenuCategoryController extends Controller
         return response()->json(MenuCategory::create($data), 201);
     }
 
-    public function show(MenuCategory $menuCategory): JsonResponse
+    // Route-bound parameter is named $category because the apiResource route is
+    // /admin/menu/categories/{category}. Laravel's implicit binding matches by
+    // parameter name; using $menuCategory here would skip the binding and inject
+    // a fresh empty model instead of the bound row.
+    public function show(MenuCategory $category): JsonResponse
     {
-        return response()->json($menuCategory->load('items'));
+        return response()->json($category->load('items'));
     }
 
-    public function update(Request $request, MenuCategory $menuCategory): JsonResponse
+    public function update(Request $request, MenuCategory $category): JsonResponse
     {
         $data = $request->validate([
             'name'           => ['sometimes', 'string', 'max:100'],
@@ -55,14 +59,14 @@ class MenuCategoryController extends Controller
             $data['slug'] = Str::slug($data['name']);
         }
 
-        $menuCategory->update($data);
+        $category->update($data);
 
-        return response()->json($menuCategory->fresh());
+        return response()->json($category->fresh());
     }
 
-    public function destroy(MenuCategory $menuCategory): JsonResponse
+    public function destroy(MenuCategory $category): JsonResponse
     {
-        $menuCategory->delete();
+        $category->delete();
 
         return response()->json(['message' => 'Category deleted.']);
     }

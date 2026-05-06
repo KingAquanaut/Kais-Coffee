@@ -43,9 +43,9 @@ export default async function HomePage() {
     }
     if (seasonalRes.ok) seasonalItems = await seasonalRes.json();
     if (promoRes.ok) {
-      // Endpoint returns null when no spotlight is configured.
-      const body = await promoRes.json();
-      promotionalItem = body && typeof body === "object" ? body as MenuItem : null;
+      // Endpoint always returns { item: MenuItem | null }.
+      const body = await promoRes.json() as { item: MenuItem | null };
+      promotionalItem = body?.item ?? null;
     }
   } catch { /* render with nulls → client uses translation fallbacks */ }
 
