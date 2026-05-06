@@ -212,7 +212,9 @@ class MenuVariantsTest extends TestCase
     {
         $res = $this->getJson('/api/v1/menu/promotional');
         $res->assertOk();
-        $res->assertExactJson(['item' => null]);
+        // Endpoint always returns both fields so consumers don't have to
+        // discriminate between absent and null.
+        $res->assertExactJson(['item' => null, 'label' => null]);
     }
 
     public function test_admin_can_set_and_clear_featured_drink(): void
