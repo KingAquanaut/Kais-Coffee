@@ -58,6 +58,8 @@ const translations = {
       seasonalTitle:    "Seasonal Favorites",
       seasonalSubtext:  "Try our handpicked specials — available for a limited time only.",
       seasonalCta:      "View Full Menu",
+      spotlightBadge:   "Drink of the Moment",
+      spotlightCta:     "See it on the menu",
       footer:           "Made with care",
     },
     menu: {
@@ -161,6 +163,8 @@ const translations = {
       seasonalTitle:    "Favoritos de Temporada",
       seasonalSubtext:  "Prueba nuestras especialidades seleccionadas — disponibles por tiempo limitado.",
       seasonalCta:      "Ver Menú Completo",
+      spotlightBadge:   "Bebida del Momento",
+      spotlightCta:     "Verla en el menú",
       footer:           "Hecho con cuidado",
     },
     menu: {

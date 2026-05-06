@@ -16,10 +16,17 @@ export type MenuCategory = {
   id: number; name: string; name_es: string | null; slug: string; description: string | null; description_es: string | null; image_url: string | null;
   sort_order: number; is_active: boolean; active_items?: MenuItem[];
 };
+export type MenuItemVariant = {
+  id: number; menu_item_id?: number;
+  size_label: string; price: string;
+  sort_order: number; is_active: boolean;
+};
 export type MenuItem = {
   id: number; menu_category_id: number; name: string; name_es: string | null; slug: string; description: string | null; description_es: string | null;
   price: string; image_url: string | null; is_active: boolean; is_featured: boolean; is_seasonal: boolean; sort_order: number;
   category?: { id: number; name: string; slug: string };
+  variants?: MenuItemVariant[];
+  active_variants?: MenuItemVariant[];
 };
 export type PurchaseItem = { id: number; menu_item_id: number | null; name: string; unit_price: string; quantity: number; subtotal: string; };
 export type Purchase = {
@@ -131,6 +138,7 @@ export const menu = {
   items: ()    => req<MenuItem[]>("/menu/items"),
   featured: () => req<MenuItem[]>("/menu/featured"),
   seasonal: () => req<MenuItem[]>("/menu/seasonal"),
+  promotional: () => req<{ item: MenuItem | null }>("/menu/promotional"),
 };
 
 // ── Account ────────────────────────────────────────────────────────────────
@@ -187,6 +195,15 @@ export const admin = {
       fd.append("image", file);
       return upload<MenuItem>(`/admin/menu/items/${id}/image`, fd, token);
     },
+    getFeaturedDrink: (token: string) =>
+      req<{ menu_item_id: number | null; item: MenuItem | null }>(
+        "/admin/menu/featured-drink", { token },
+      ),
+    setFeaturedDrink: (token: string, menuItemId: number | null) =>
+      req<{ menu_item_id: number | null; item: MenuItem | null }>(
+        "/admin/menu/featured-drink",
+        { method: "PUT", body: { menu_item_id: menuItemId }, token },
+      ),
   },
   purchases: {
     list: (token: string, page = 1) => req<Paginated<Purchase>>(`/admin/purchases?page=${page}`, { token }),

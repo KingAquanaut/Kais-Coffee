@@ -4,15 +4,29 @@ import Link from "next/link";
 import ItemImage from "@/components/ui/ItemImage";
 import { useLang } from "@/contexts/LangContext";
 import { useAuth } from "@/contexts/AuthContext";
-import type { MenuCategory, MenuItem } from "@/lib/api";
+import type { MenuCategory, MenuItem, MenuItemVariant } from "@/lib/api";
+
+// Pull the active size variants from the API payload — Laravel serializes
+// the `activeVariants` relation as `active_variants`, but we also accept
+// the raw `variants` field for admin previews.
+function getVariants(item: MenuItem): MenuItemVariant[] {
+  return item.active_variants ?? item.variants ?? [];
+}
 
 // ── Single item tile — flip card with smoke effect ────────────────────────────
 function MenuTile({ item }: { item: MenuItem }) {
   const { lang } = useLang();
   const [flipped, setFlipped] = useState(false);
+  const variants = getVariants(item);
+  const [activeVariantId, setActiveVariantId] = useState<number | null>(
+    variants.length > 0 ? variants[0].id : null,
+  );
+  const activeVariant = variants.find(v => v.id === activeVariantId) ?? null;
   const displayName = (lang === "es" && item.name_es) ? item.name_es : item.name;
   const displayDescription = (lang === "es" && item.description_es) ? item.description_es : item.description;
-  const price = `$${parseFloat(item.price).toFixed(2)}`;
+  const displayPrice = activeVariant
+    ? `$${parseFloat(activeVariant.price).toFixed(2)}`
+    : `$${parseFloat(item.price).toFixed(2)}`;
   const hasDescription = Boolean(displayDescription?.trim());
 
   const toggle = useCallback(() => {
@@ -49,8 +63,15 @@ function MenuTile({ item }: { item: MenuItem }) {
             {displayName}
           </h3>
           <p className="font-semibold" style={{ fontSize: "0.875rem", color: "var(--kc-black)" }}>
-            {price}
+            {displayPrice}
           </p>
+          {variants.length > 0 && (
+            <SizePills
+              variants={variants}
+              activeId={activeVariantId}
+              onSelect={setActiveVariantId}
+            />
+          )}
         </div>
 
         {/* ── Back — description / recipe ── */}
@@ -87,11 +108,46 @@ function MenuTile({ item }: { item: MenuItem }) {
               {displayDescription}
             </p>
             <p className="font-bold mt-2" style={{ fontSize: "0.875rem", color: "var(--kc-gold)" }}>
-              {price}
+              {displayPrice}
             </p>
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Size pills (12oz / 16oz) — only rendered when item has variants ─────────
+function SizePills({
+  variants, activeId, onSelect,
+}: {
+  variants: MenuItemVariant[];
+  activeId: number | null;
+  onSelect: (id: number) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-1.5 mt-1">
+      {variants.map(v => {
+        const active = v.id === activeId;
+        return (
+          <button
+            key={v.id}
+            type="button"
+            onClick={e => { e.stopPropagation(); onSelect(v.id); }}
+            className="px-2.5 py-0.5 rounded-full text-[0.7rem] font-semibold transition-colors"
+            style={{
+              background: active ? "var(--kc-blue-deep)" : "rgba(255,255,255,0.85)",
+              color: active ? "#fff" : "var(--kc-blue-deep)",
+              border: "1px solid var(--kc-blue-deep)",
+              letterSpacing: "0.02em",
+            }}
+            aria-pressed={active}
+            aria-label={`${v.size_label} for $${Number.parseFloat(v.price).toFixed(2)}`}
+          >
+            {v.size_label}
+          </button>
+        );
+      })}
     </div>
   );
 }
