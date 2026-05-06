@@ -66,8 +66,9 @@ export default function AdminMenuPage() {
   const [catDrawer,  setCatDrawer]  = useState<MenuCategory | null>(null);
   const [deleteItem, setDeleteItem] = useState<MenuItem | null>(null);
 
-  // Home-page spotlight (single featured drink)
+  // Home-page spotlight (single featured drink + label override)
   const [featuredDrinkId, setFeaturedDrinkId] = useState<number | null>(null);
+  const [featuredLabel, setFeaturedLabel] = useState<string>("");
   const [savingFeatured, setSavingFeatured] = useState(false);
 
   const token = getToken();
@@ -78,12 +79,13 @@ export default function AdminMenuPage() {
     Promise.all([
       adminApi.menu.categories(token),
       adminApi.menu.items(token),
-      adminApi.menu.getFeaturedDrink(token).catch(() => ({ menu_item_id: null, item: null })),
+      adminApi.menu.getFeaturedDrink(token).catch(() => ({ menu_item_id: null, item: null, label: null })),
     ])
       .then(([cats, its, featured]) => {
         setCategories(cats);
         setItems(its);
         setFeaturedDrinkId(featured.menu_item_id ?? null);
+        setFeaturedLabel(featured.label ?? "");
       })
       .catch(() => setToast({ kind: "error", message: "Could not load menu data." }))
       .finally(() => setLoading(false));
@@ -156,6 +158,30 @@ export default function AdminMenuPage() {
     }
   };
 
+  // Persists the spotlight label override. Empty/blank string clears the
+  // setting on the server, which makes the public site fall back to the
+  // localized default ("Drink of the Moment"). Called on blur from the
+  // FeaturedDrinkCard's input — keystroke-level saves would be wasteful.
+  const handleFeaturedLabelChange = async (nextLabel: string) => {
+    if (!token) return;
+    const trimmed = nextLabel.trim();
+    // Skip the round-trip when nothing actually changed.
+    if (trimmed === (featuredLabel ?? "").trim()) return;
+    setSavingFeatured(true);
+    const prev = featuredLabel;
+    setFeaturedLabel(trimmed);  // optimistic
+    try {
+      await adminApi.menu.setFeaturedDrinkLabel(token, trimmed === "" ? null : trimmed);
+      showMsg("success", trimmed === "" ? "Spotlight label cleared" : "Spotlight label updated");
+      revalidate(["/"]);
+    } catch (e) {
+      setFeaturedLabel(prev);
+      showMsg("error", e instanceof Error ? e.message : "Couldn’t update label");
+    } finally {
+      setSavingFeatured(false);
+    }
+  };
+
   const handleCatSaved = (cat: MenuCategory) => {
     setCategories(list => list.map(c => c.id === cat.id ? cat : c));
     setCatDrawer(null);
@@ -188,8 +214,10 @@ export default function AdminMenuPage() {
       <FeaturedDrinkCard
         items={items}
         featuredDrinkId={featuredDrinkId}
+        featuredLabel={featuredLabel}
         saving={savingFeatured}
         onChange={handleFeaturedChange}
+        onLabelChange={handleFeaturedLabelChange}
       />
 
       {/* Categories */}
@@ -976,62 +1004,112 @@ function CategoryDrawer({
 /* ──────────────────────────────────────────────────────────────────────── */
 
 function FeaturedDrinkCard({
-  items, featuredDrinkId, saving, onChange,
+  items, featuredDrinkId, featuredLabel, saving, onChange, onLabelChange,
 }: {
   items: MenuItem[];
   featuredDrinkId: number | null;
+  featuredLabel: string;
   saving: boolean;
   onChange: (id: number | null) => void;
+  onLabelChange: (label: string) => void;
 }) {
   const activeItems = items.filter(i => i.is_active);
   const current = items.find(i => i.id === featuredDrinkId) ?? null;
 
+  // Local input state so users can type freely without each keystroke firing a
+  // network request — the parent's onLabelChange handler is invoked on blur.
+  const [labelDraft, setLabelDraft] = useState<string>(featuredLabel);
+  // Re-sync when the parent prop changes (e.g. initial load resolves).
+  useEffect(() => { setLabelDraft(featuredLabel); }, [featuredLabel]);
+
+  const commitLabel = () => onLabelChange(labelDraft);
+
   return (
     <Card padding="none">
-      <div className="px-5 py-4 flex items-center gap-4 flex-wrap">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <ItemImage
-            name={current?.name ?? "Spotlight"}
-            imageUrl={current?.image_url ?? null}
-            size={48}
-          />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold" style={{ color: "var(--admin-ink)" }}>
-              Home-page spotlight drink
-            </p>
-            <p className="text-xs mt-0.5" style={{ color: "var(--admin-ink-muted)" }}>
-              {current
-                ? <>Currently promoting <span style={{ color: "var(--admin-ink)" }}>{current.name}</span> on the public home page.</>
-                : "No drink selected — the home page falls back to the default hero."}
-            </p>
+      <div className="px-5 py-4 flex flex-col gap-4">
+        {/* Row 1: drink picker + summary */}
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <ItemImage
+              name={current?.name ?? "Spotlight"}
+              imageUrl={current?.image_url ?? null}
+              size={48}
+            />
+            <div className="min-w-0">
+              <p className="text-sm font-semibold" style={{ color: "var(--admin-ink)" }}>
+                Home-page spotlight drink
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: "var(--admin-ink-muted)" }}>
+                {current
+                  ? <>Currently promoting <span style={{ color: "var(--admin-ink)" }}>{current.name}</span> on the public home page.</>
+                  : "No drink selected — the home page falls back to the default hero."}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <select
+              className="admin-select"
+              value={featuredDrinkId ?? ""}
+              disabled={saving || activeItems.length === 0}
+              onChange={e => {
+                const v = e.target.value;
+                onChange(v === "" ? null : Number(v));
+              }}
+              style={{ minWidth: 220 }}
+            >
+              <option value="">— none —</option>
+              {activeItems.map(i => (
+                <option key={i.id} value={i.id}>{i.name}</option>
+              ))}
+            </select>
+            {featuredDrinkId !== null && (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => onChange(null)}
+                disabled={saving}
+              >
+                Clear
+              </Button>
+            )}
           </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <select
-            className="admin-select"
-            value={featuredDrinkId ?? ""}
-            disabled={saving || activeItems.length === 0}
-            onChange={e => {
-              const v = e.target.value;
-              onChange(v === "" ? null : Number(v));
-            }}
-            style={{ minWidth: 220 }}
-          >
-            <option value="">— none —</option>
-            {activeItems.map(i => (
-              <option key={i.id} value={i.id}>{i.name}</option>
-            ))}
-          </select>
-          {featuredDrinkId !== null && (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => onChange(null)}
-              disabled={saving}
+
+        {/* Row 2: label override */}
+        <div
+          className="flex items-center gap-3 flex-wrap pt-3"
+          style={{ borderTop: "1px solid var(--admin-border)" }}
+        >
+          <div className="flex-1 min-w-0">
+            <label
+              htmlFor="featured-drink-label"
+              className="text-sm font-semibold block"
+              style={{ color: "var(--admin-ink)" }}
             >
-              Clear
-            </Button>
-          )}
+              Spotlight label
+            </label>
+            <p className="text-xs mt-0.5" style={{ color: "var(--admin-ink-muted)" }}>
+              Shown above the drink name on the home page. Leave blank to use “Drink of the Moment”.
+            </p>
+          </div>
+          <input
+            id="featured-drink-label"
+            type="text"
+            className="admin-input"
+            value={labelDraft}
+            disabled={saving}
+            maxLength={80}
+            placeholder="Drink of the Moment"
+            onChange={e => setLabelDraft(e.target.value)}
+            onBlur={commitLabel}
+            onKeyDown={e => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                commitLabel();
+              }
+            }}
+            style={{ minWidth: 220, maxWidth: 320 }}
+          />
         </div>
       </div>
     </Card>

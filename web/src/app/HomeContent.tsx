@@ -250,7 +250,7 @@ function DefaultHero({ heroImageUrl, cmsHeading, cmsSubtext }: HeroSectionProps)
 // hero card with image, name, description, price, and a CTA to the menu.
 // Falls back gracefully (component is not rendered at all) when no spotlight
 // is configured — the page above just skips it.
-export function SpotlightSection({ item }: { item: MenuItem }) {
+export function SpotlightSection({ item, label }: { item: MenuItem; label?: string | null }) {
   const { lang, strings } = useLang();
   const variants = item.active_variants ?? item.variants ?? [];
   const name = (lang === "es" && item.name_es) ? item.name_es : item.name;
@@ -261,6 +261,9 @@ export function SpotlightSection({ item }: { item: MenuItem }) {
     ? Number.parseFloat(variants[0].price)
     : Number.parseFloat(item.price);
   const priceLabel = `$${priceNum.toFixed(2)}`;
+  // Admin-edited label takes precedence; if blank/null, fall back to the
+  // localized default ("Drink of the Moment" / "Bebida del Momento").
+  const badgeText = (label && label.trim()) ? label.trim() : strings.home.spotlightBadge;
 
   return (
     <section className="px-6 pt-20 pb-6">
@@ -297,7 +300,7 @@ export function SpotlightSection({ item }: { item: MenuItem }) {
                   boxShadow: "0 2px 8px rgba(184,150,46,0.25)",
                 }}
               >
-                ✦ {strings.home.spotlightBadge}
+                ✦ {badgeText}
               </span>
               <h2
                 className="font-bold leading-tight"
