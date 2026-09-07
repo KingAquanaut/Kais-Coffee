@@ -20,6 +20,7 @@ class MenuItem extends Model
         'description_es',
         'price',
         'image_url',
+        'image_crop',
         'is_active',
         'is_featured',
         'is_seasonal',
@@ -30,6 +31,7 @@ class MenuItem extends Model
     {
         return [
             'price' => 'decimal:2',
+            'image_crop' => 'array',
             'is_active' => 'boolean',
             'is_featured' => 'boolean',
             'is_seasonal' => 'boolean',

@@ -1,6 +1,6 @@
 import PublicNav from "@/components/layout/PublicNav";
 import { HeroSection, SpotlightSection, SeasonalSection, StampSection, PillarsSection, HomeFooter, type PillarCms } from "./HomeContent";
-import { optimized } from "@/lib/cloudinary";
+import { cropped, parseCrop } from "@/lib/cloudinary";
 import type { PageContent, MenuItem } from "@/lib/api";
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
@@ -12,6 +12,7 @@ const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
 export default async function HomePage() {
   // Raw API values — null means not customised by admin → client falls back to translation string
   let heroImageUrl:  string | null = null;
+  let heroImageCrop: import("@/lib/cloudinary").CropRect | null = null;
   let cmsHeading:    string | null = null;
   let cmsSubtext:    string | null = null;
   let seasonalItems: MenuItem[] = [];
@@ -27,6 +28,7 @@ export default async function HomePage() {
     if (cmsRes.ok) {
       const data: PageContent = await cmsRes.json();
       heroImageUrl = (data.hero_image_url as string | null) || null;
+      heroImageCrop = parseCrop(data.hero_image_crop);
       cmsHeading   = (data.hero_heading   as string | null) || null;
       cmsSubtext   = (data.hero_subtext   as string | null) || null;
 
@@ -52,7 +54,7 @@ export default async function HomePage() {
   } catch { /* render with nulls → client uses translation fallbacks */ }
 
   const heroImageOptimized = heroImageUrl
-    ? optimized(heroImageUrl, "f_auto,q_auto,w_1600,c_limit")
+    ? cropped(heroImageUrl, heroImageCrop, "f_auto,q_auto,w_1600,c_limit")
     : null;
 
   return (

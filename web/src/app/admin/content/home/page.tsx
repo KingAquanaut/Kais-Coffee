@@ -6,7 +6,9 @@ import { Card, CardHeader, CardTitle } from "@/components/admin/Card";
 import Button from "@/components/admin/Button";
 import LoadingState from "@/components/admin/LoadingState";
 import Toast from "@/components/admin/Toast";
-import { admin as adminApi, ApiError, revalidate } from "@/lib/api";
+import ImageCropper from "@/components/admin/ImageCropper";
+import { admin as adminApi, ApiError, revalidate, type CropRect } from "@/lib/api";
+import { optimized, cropped, parseCrop } from "@/lib/cloudinary";
 import { getToken } from "@/contexts/AuthContext";
 
 // ── Defaults ──────────────────────────────────────────────────────────────
@@ -41,6 +43,8 @@ export default function AdminHomePage() {
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [removeHero, setRemoveHero] = useState(false);
   const [savingHero, setSavingHero] = useState(false);
+  const [heroCrop, setHeroCrop] = useState<CropRect | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -52,6 +56,7 @@ export default function AdminHomePage() {
           if (data[k] !== null && data[k] !== undefined) merged[k] = data[k] ?? "";
         }
         setForm(merged);
+        setHeroCrop(parseCrop(data.hero_image_crop));
       })
       .catch(() => setToast({ kind: "error", message: "Could not load page content." }))
       .finally(() => setLoading(false));
@@ -90,11 +95,13 @@ export default function AdminHomePage() {
         const updated = await adminApi.pageContent.removeImage(token, "home");
         setForm(f => ({ ...f, hero_image_url: updated.hero_image_url ?? "" }));
         setRemoveHero(false);
+        setHeroCrop(null);
         setToast({ kind: "success", message: "Hero image removed" });
       } else if (imageFile) {
         const updated = await adminApi.pageContent.uploadImage(token, "home", imageFile);
         setForm(f => ({ ...f, hero_image_url: updated.hero_image_url ?? "" }));
         setImageFile(null);
+        setHeroCrop(null); // server cleared the crop; mirror that locally
         if (fileInputRef.current) fileInputRef.current.value = "";
         setToast({ kind: "success", message: "Hero image updated" });
       }
@@ -105,6 +112,21 @@ export default function AdminHomePage() {
       setToast({ kind: "error", message: msg });
     } finally {
       setSavingHero(false);
+    }
+  };
+
+  // Persist the crop rect on its own (via the text-content endpoint — the key
+  // does not end in _url, so it round-trips). Applied immediately on "Apply crop".
+  const saveCrop = async (crop: CropRect | null) => {
+    if (!token) return;
+    setHeroCrop(crop);
+    setCropOpen(false);
+    try {
+      await adminApi.pageContent.update(token, "home", { hero_image_crop: crop ? JSON.stringify(crop) : "" });
+      await revalidate(["/"]);
+      setToast({ kind: "success", message: "Crop saved" });
+    } catch (e) {
+      setToast({ kind: "error", message: e instanceof Error ? e.message : "Could not save crop." });
     }
   };
 
@@ -120,7 +142,13 @@ export default function AdminHomePage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const currentImageUrl = removeHero ? null : (imagePreviewUrl ?? (form.hero_image_url || null));
+  const currentImageUrl = removeHero
+    ? null
+    : imagePreviewUrl
+      ? imagePreviewUrl
+      : form.hero_image_url
+        ? cropped(form.hero_image_url, heroCrop, "f_auto,q_auto,w_400,c_limit")
+        : null;
 
   if (loading) {
     return <AdminLayout><LoadingState text="Loading page content…" /></AdminLayout>;
@@ -185,6 +213,14 @@ export default function AdminHomePage() {
                     {imageFile ? "Change file…" : "Upload image"}
                   </span>
                 </label>
+                {form.hero_image_url && !imageFile && !removeHero && (
+                  <button type="button"
+                          onClick={() => setCropOpen(true)}
+                          className="text-xs font-semibold"
+                          style={{ color: "var(--admin-accent)" }}>
+                    {heroCrop ? "Adjust crop / position" : "Crop / reposition"}
+                  </button>
+                )}
                 {(form.hero_image_url || imageFile) && !removeHero && (
                   <button type="button"
                           onClick={() => { setRemoveHero(true); setImageFile(null); }}
@@ -307,6 +343,19 @@ export default function AdminHomePage() {
       </div>
 
       {toast && <Toast kind={toast.kind} message={toast.message} onDismiss={() => setToast(null)} />}
+
+      {cropOpen && form.hero_image_url && (
+        <ImageCropper
+          src={optimized(form.hero_image_url, "f_auto,q_auto,w_1400,c_limit")!}
+          aspect={16 / 9}
+          cropShape="rect"
+          initialCrop={heroCrop}
+          title="Reposition hero image"
+          description="Choose the focal area shown behind the headline · saved on apply"
+          onCancel={() => setCropOpen(false)}
+          onSave={saveCrop}
+        />
+      )}
     </AdminLayout>
   );
 }

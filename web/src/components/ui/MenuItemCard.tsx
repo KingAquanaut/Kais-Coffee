@@ -17,7 +17,7 @@ export default function MenuItemCard({ item, compact = false, action }: Props) {
   if (compact) {
     return (
       <div className="flex items-center gap-3 py-3 px-4" style={{ borderBottom: "1px solid var(--kc-cream-dark)" }}>
-        <ItemImage name={item.name} imageUrl={item.image_url} size={52} />
+        <ItemImage name={item.name} imageUrl={item.image_url} crop={item.image_crop} size={52} />
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm truncate" style={{ fontFamily: "var(--font-heading)" }}>{displayName}</p>
           <p className="text-xs mt-0.5" style={{ color: "var(--kc-muted)" }}>{item.category?.name}</p>
@@ -32,7 +32,7 @@ export default function MenuItemCard({ item, compact = false, action }: Props) {
 
   return (
     <div className="kc-card flex flex-col items-center text-center p-5 gap-4 hover:shadow-md transition-shadow">
-      <ItemImage name={item.name} imageUrl={item.image_url} size={96} />
+      <ItemImage name={item.name} imageUrl={item.image_url} crop={item.image_crop} size={96} />
       <div className="flex-1">
         <h3 className="font-bold text-base leading-snug" style={{ fontFamily: "var(--font-heading)" }}>
           {displayName}

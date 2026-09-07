@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\PageContent;
+use App\Rules\ValidCropRect;
 use App\Services\UploadService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -26,9 +27,18 @@ class PageContentController extends Controller
      */
     public function update(Request $request, string $page): JsonResponse
     {
-        $data = $request->validate([
-            '*' => ['nullable', 'string', 'max:5000'],
-        ]);
+        // Crop rectangles ride through this key/value endpoint as JSON strings
+        // (page_contents is a flat text store), so they need the same structural
+        // validation menu_items.image_crop gets from its json column. Keys are
+        // dynamic, so the rules are built per request from the *_crop suffix.
+        $rules = ['*' => ['nullable', 'string', 'max:5000']];
+        foreach (array_keys($request->all()) as $key) {
+            if (str_ends_with($key, '_crop')) {
+                $rules[$key] = ['nullable', 'string', 'max:5000', new ValidCropRect];
+            }
+        }
+
+        $data = $request->validate($rules);
 
         // Prevent overwriting image URLs via this endpoint — use uploadImage instead
         foreach (array_keys($data) as $key) {
@@ -59,6 +69,8 @@ class PageContentController extends Controller
         $imageUrl = $this->uploads->store($request->file('image'), "pages/{$page}");
 
         PageContent::set($page, 'hero_image_url', $imageUrl);
+        // A fresh image invalidates any crop saved against the previous one.
+        PageContent::set($page, 'hero_image_crop', null);
 
         return response()->json(PageContent::forPage($page));
     }
@@ -74,6 +86,7 @@ class PageContentController extends Controller
         }
 
         PageContent::set($page, 'hero_image_url', null);
+        PageContent::set($page, 'hero_image_crop', null);
 
         return response()->json(PageContent::forPage($page));
     }
@@ -102,6 +115,8 @@ class PageContentController extends Controller
         $imageUrl = $this->uploads->store($request->file('image'), "pages/{$page}/{$imageKey}");
 
         PageContent::set($page, $field, $imageUrl);
+        // A fresh image invalidates any crop saved against the previous one.
+        PageContent::set($page, $imageKey . '_crop', null);
 
         return response()->json(PageContent::forPage($page));
     }
@@ -123,6 +138,7 @@ class PageContentController extends Controller
         }
 
         PageContent::set($page, $field, null);
+        PageContent::set($page, $imageKey . '_crop', null);
 
         return response()->json(PageContent::forPage($page));
     }

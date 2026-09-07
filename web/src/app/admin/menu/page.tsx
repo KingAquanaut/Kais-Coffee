@@ -11,10 +11,12 @@ import FormDrawer from "@/components/admin/FormDrawer";
 import ConfirmDialog from "@/components/admin/ConfirmDialog";
 import Toast from "@/components/admin/Toast";
 import ItemImage from "@/components/ui/ItemImage";
+import ImageCropper from "@/components/admin/ImageCropper";
 import {
   IconPlus, IconEdit, IconTrash, IconCoffee, IconEye, IconEyeOff,
 } from "@/components/admin/Icon";
-import { admin as adminApi, revalidate, type MenuCategory, type MenuItem } from "@/lib/api";
+import { admin as adminApi, revalidate, type MenuCategory, type MenuItem, type CropRect } from "@/lib/api";
+import { optimized } from "@/lib/cloudinary";
 import { getToken } from "@/contexts/AuthContext";
 
 type ItemForm = {
@@ -63,7 +65,7 @@ export default function AdminMenuPage() {
 
   // Drawers / dialogs
   const [itemDrawer, setItemDrawer] = useState<{ mode: "create" | "edit"; item?: MenuItem } | null>(null);
-  const [catDrawer,  setCatDrawer]  = useState<MenuCategory | null>(null);
+  const [catDrawer,  setCatDrawer]  = useState<MenuCategory | "new" | null>(null);
   const [deleteItem, setDeleteItem] = useState<MenuItem | null>(null);
 
   // Home-page spotlight (single featured drink + label override)
@@ -182,10 +184,13 @@ export default function AdminMenuPage() {
     }
   };
 
-  const handleCatSaved = (cat: MenuCategory) => {
-    setCategories(list => list.map(c => c.id === cat.id ? cat : c));
+  const handleCatSaved = (cat: MenuCategory, mode: "create" | "edit") => {
+    setCategories(list =>
+      mode === "create"
+        ? [...list, cat].sort((a, b) => a.sort_order - b.sort_order)
+        : list.map(c => (c.id === cat.id ? cat : c)));
     setCatDrawer(null);
-    showMsg("success", "Category updated");
+    showMsg("success", mode === "create" ? "Category created" : "Category updated");
     revalidate(["/menu", "/"]);
   };
 
@@ -227,6 +232,14 @@ export default function AdminMenuPage() {
               style={{ color: "var(--admin-ink-muted)" }}>
             Categories
           </h2>
+          <Button
+            variant="secondary"
+            size="sm"
+            leftIcon={<IconPlus size={15} />}
+            onClick={() => setCatDrawer("new")}
+          >
+            Add Category
+          </Button>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {categories.map(cat => (
@@ -327,7 +340,7 @@ export default function AdminMenuPage() {
                   className="flex items-center gap-3 p-4"
                   style={{ borderBottom: "1px solid var(--admin-border)" }}
                 >
-                  <ItemImage name={item.name} imageUrl={item.image_url} size={56} />
+                  <ItemImage name={item.name} imageUrl={item.image_url} crop={item.image_crop} size={56} />
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm truncate" style={{ color: "var(--admin-ink)" }}>
                       {item.name}
@@ -403,10 +416,11 @@ export default function AdminMenuPage() {
         />
       )}
 
-      {/* Category drawer */}
+      {/* Category drawer (create when "new", otherwise edit) */}
       {catDrawer && (
         <CategoryDrawer
-          category={catDrawer}
+          category={catDrawer === "new" ? null : catDrawer}
+          nextSortOrder={categories.reduce((m, c) => Math.max(m, c.sort_order), -1) + 1}
           onClose={() => setCatDrawer(null)}
           onSaved={handleCatSaved}
           onError={msg => showMsg("error", msg)}
@@ -477,6 +491,9 @@ function ItemDrawer({
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [removeImage, setRemoveImage] = useState(false);
+  // Non-destructive crop metadata for the current (already-uploaded) image.
+  const [cropRect, setCropRect] = useState<CropRect | null>(item?.image_crop ?? null);
+  const [cropOpen, setCropOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -496,13 +513,14 @@ function ItemDrawer({
     () => JSON.stringify({
       ...form,
       categoryId,
+      cropRect,
       variants: variants.map(v => ({
         size_label: v.size_label.trim(),
         price: v.price,
         is_active: v.is_active,
       })),
     }),
-    [form, categoryId, variants],
+    [form, categoryId, variants, cropRect],
   );
 
   useEffect(() => {
@@ -537,7 +555,7 @@ function ItemDrawer({
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form, categoryId, variants]);
+  }, [form, categoryId, variants, cropRect]);
 
   // Warn on unload if there are unsaved changes (text or image).
   useEffect(() => {
@@ -575,6 +593,7 @@ function ItemDrawer({
         description: form.description,
         description_es: form.description_es || null,
         price: parseFloat(form.price) as unknown as never,
+        image_crop: cropRect,
         is_featured: form.is_featured,
         is_seasonal: form.is_seasonal,
         is_active: form.is_active,
@@ -612,7 +631,7 @@ function ItemDrawer({
     } finally {
       inFlightRef.current = false;
     }
-  }, [item, form, categoryId, variants, buildSnapshot, onAutoSaved]);
+  }, [item, form, categoryId, variants, cropRect, buildSnapshot, onAutoSaved]);
 
   // Flush any pending auto-save before closing, then revalidate public pages
   // once (instead of revalidating on every keystroke).
@@ -656,6 +675,7 @@ function ItemDrawer({
         description: form.description,
         description_es: form.description_es || null,
         price: parseFloat(form.price) as unknown as never,
+        image_crop: cropRect,
         is_featured: form.is_featured,
         is_seasonal: form.is_seasonal,
         is_active: form.is_active,
@@ -696,6 +716,7 @@ function ItemDrawer({
   };
 
   return (
+   <>
     <FormDrawer
       open
       onClose={handleClose}
@@ -735,7 +756,7 @@ function ItemDrawer({
         <div>
           <label className="admin-label">Drink image</label>
           <div className="flex items-center gap-4">
-            <ItemImage name={form.name || "Item"} imageUrl={previewUrl} size={72} />
+            <ItemImage name={form.name || "Item"} imageUrl={previewUrl} crop={imageFile ? null : cropRect} size={72} />
             <div className="flex flex-col gap-2 flex-1 min-w-0">
               <input
                 ref={fileInputRef}
@@ -745,7 +766,7 @@ function ItemDrawer({
                 onChange={e => {
                   const f = e.target.files?.[0] ?? null;
                   setImageFile(f);
-                  if (f) setRemoveImage(false);
+                  if (f) { setRemoveImage(false); setCropRect(null); }
                   if (fileInputRef.current) fileInputRef.current.value = "";
                 }}
                 id="item-image"
@@ -767,10 +788,22 @@ function ItemDrawer({
                   {imageFile.name}
                 </p>
               )}
+              {/* Reposition/crop is only available for an already-uploaded image
+                  (a pending local file must be saved first so Cloudinary has it). */}
+              {item?.image_url && !imageFile && !removeImage && (
+                <button
+                  type="button"
+                  onClick={() => setCropOpen(true)}
+                  className="text-xs font-semibold self-start"
+                  style={{ color: "var(--admin-accent)" }}
+                >
+                  {cropRect ? "Adjust crop / position" : "Crop / reposition"}
+                </button>
+              )}
               {(item?.image_url || imageFile) && !removeImage && (
                 <button
                   type="button"
-                  onClick={() => { setRemoveImage(true); setImageFile(null); }}
+                  onClick={() => { setRemoveImage(true); setImageFile(null); setCropRect(null); }}
                   className="text-xs font-semibold self-start"
                   style={{ color: "var(--admin-danger)" }}
                 >
@@ -907,6 +940,20 @@ function ItemDrawer({
         </div>
       </div>
     </FormDrawer>
+
+    {cropOpen && item?.image_url && (
+      <ImageCropper
+        src={optimized(item.image_url, "f_auto,q_auto,w_1000,c_limit")!}
+        aspect={1}
+        cropShape="round"
+        initialCrop={cropRect}
+        title="Reposition drink image"
+        description="Drag to reposition · pinch or use the slider to zoom · crop is saved automatically"
+        onCancel={() => setCropOpen(false)}
+        onSave={c => { setCropRect(c); setCropOpen(false); }}
+      />
+    )}
+   </>
   );
 }
 
@@ -915,18 +962,20 @@ function ItemDrawer({
 /* ──────────────────────────────────────────────────────────────────────── */
 
 function CategoryDrawer({
-  category, onClose, onSaved, onError,
+  category, nextSortOrder, onClose, onSaved, onError,
 }: {
-  category: MenuCategory;
+  category: MenuCategory | null;
+  nextSortOrder: number;
   onClose: () => void;
-  onSaved: (cat: MenuCategory) => void;
+  onSaved: (cat: MenuCategory, mode: "create" | "edit") => void;
   onError: (msg: string) => void;
 }) {
+  const isCreate = category === null;
   const [form, setForm] = useState<CatForm>({
-    name: category.name,
-    name_es: category.name_es ?? "",
-    description: category.description ?? "",
-    description_es: category.description_es ?? "",
+    name: category?.name ?? "",
+    name_es: category?.name_es ?? "",
+    description: category?.description ?? "",
+    description_es: category?.description_es ?? "",
   });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -937,14 +986,24 @@ function CategoryDrawer({
     if (!form.name.trim()) { setErr("Name is required."); return; }
     setErr(null);
     setSaving(true);
+    const body = {
+      name: form.name.trim(),
+      name_es: form.name_es.trim() || null,
+      description: form.description || null,
+      description_es: form.description_es || null,
+    } as Partial<MenuCategory>;
     try {
-      const updated = await adminApi.menu.updateCategory(token, category.id, {
-        name: form.name.trim(),
-        name_es: form.name_es.trim() || null,
-        description: form.description || null,
-        description_es: form.description_es || null,
-      } as Partial<MenuCategory>);
-      onSaved(updated);
+      if (isCreate) {
+        const created = await adminApi.menu.createCategory(token, {
+          ...body,
+          sort_order: nextSortOrder,
+          is_active: true,
+        });
+        onSaved(created, "create");
+      } else {
+        const updated = await adminApi.menu.updateCategory(token, category.id, body);
+        onSaved(updated, "edit");
+      }
     } catch (e) {
       onError(e instanceof Error ? e.message : "Could not save");
     } finally {
@@ -956,12 +1015,12 @@ function CategoryDrawer({
     <FormDrawer
       open
       onClose={onClose}
-      title="Edit category"
-      description={category.name}
+      title={isCreate ? "New category" : "Edit category"}
+      description={isCreate ? "Add a category to group menu items" : category.name}
       footer={
         <>
           <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button variant="primary" onClick={handleSave} loading={saving}>Save</Button>
+          <Button variant="primary" onClick={handleSave} loading={saving}>{isCreate ? "Create category" : "Save"}</Button>
         </>
       }
     >
@@ -1033,6 +1092,7 @@ function FeaturedDrinkCard({
             <ItemImage
               name={current?.name ?? "Spotlight"}
               imageUrl={current?.image_url ?? null}
+              crop={current?.image_crop ?? null}
               size={48}
             />
             <div className="min-w-0">

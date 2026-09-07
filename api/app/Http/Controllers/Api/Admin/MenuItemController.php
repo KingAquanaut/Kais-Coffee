@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Admin;
 use App\Http\Controllers\Controller;
 use App\Models\MenuItem;
 use App\Models\Setting;
+use App\Rules\ValidCropRect;
 use App\Services\UploadService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -37,6 +38,26 @@ class MenuItemController extends Controller
             'variants.*.price'        => ['required_with:variants', 'numeric', 'min:0'],
             'variants.*.sort_order'   => ['nullable', 'integer'],
             'variants.*.is_active'    => ['nullable', 'boolean'],
+        ];
+    }
+
+    /**
+     * Validation rules for the non-destructive image crop rectangle. The crop is
+     * a normalized { x, y, w, h } in 0..1 fractions of the original image; null
+     * clears any existing crop. When present, all four fractions are required.
+     *
+     * The per-field rules below bound each fraction individually; ValidCropRect
+     * additionally checks the rectangle as a whole (positive area, and x+w / y+h
+     * staying inside the image) which per-field bounds alone cannot express.
+     */
+    private function cropRules(): array
+    {
+        return [
+            'image_crop'   => ['nullable', 'array', new ValidCropRect],
+            'image_crop.x' => ['required_with:image_crop', 'numeric', 'between:0,1'],
+            'image_crop.y' => ['required_with:image_crop', 'numeric', 'between:0,1'],
+            'image_crop.w' => ['required_with:image_crop', 'numeric', 'between:0,1'],
+            'image_crop.h' => ['required_with:image_crop', 'numeric', 'between:0,1'],
         ];
     }
 
@@ -97,7 +118,7 @@ class MenuItemController extends Controller
             'is_featured'      => ['nullable', 'boolean'],
             'is_seasonal'      => ['nullable', 'boolean'],
             'sort_order'       => ['nullable', 'integer'],
-        ], $this->variantRules()));
+        ], $this->variantRules(), $this->cropRules()));
 
         $variants = $data['variants'] ?? null;
         unset($data['variants']);
@@ -139,7 +160,7 @@ class MenuItemController extends Controller
             'is_featured'      => ['sometimes', 'boolean'],
             'is_seasonal'      => ['sometimes', 'boolean'],
             'sort_order'       => ['nullable', 'integer'],
-        ], $this->variantRules()));
+        ], $this->variantRules(), $this->cropRules()));
 
         $variants = $request->has('variants') ? ($data['variants'] ?? []) : null;
         unset($data['variants']);
@@ -259,7 +280,8 @@ class MenuItemController extends Controller
 
         $imageUrl = $uploads->store($request->file('image'), 'menu-items');
 
-        $menuItem->update(['image_url' => $imageUrl]);
+        // A fresh image invalidates any crop rect saved against the previous one.
+        $menuItem->update(['image_url' => $imageUrl, 'image_crop' => null]);
         $menuItem->refresh();
 
         return response()->json($menuItem->load('category:id,name,slug'));

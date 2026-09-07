@@ -60,7 +60,7 @@ function MenuTile({ item }: { item: MenuItem }) {
           className="kc-flip-front kc-menu-tile flex flex-col items-center text-center gap-1.5 px-1 py-3"
           style={{ background: "transparent" }}
         >
-          <ItemImage name={displayName} imageUrl={item.image_url} size={120} />
+          <ItemImage name={displayName} imageUrl={item.image_url} crop={item.image_crop} size={120} />
           <h3
             className="mt-2 leading-snug px-1"
             style={{ fontFamily: "var(--font-script)", fontSize: "1.05rem", color: "var(--kc-blue-deep)", fontWeight: 700 }}

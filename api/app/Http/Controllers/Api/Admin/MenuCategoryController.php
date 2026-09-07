@@ -29,9 +29,31 @@ class MenuCategoryController extends Controller
             'is_active'      => ['nullable', 'boolean'],
         ]);
 
-        $data['slug'] = Str::slug($data['name']);
+        $data['slug'] = $this->uniqueSlug($data['name']);
 
         return response()->json(MenuCategory::create($data), 201);
+    }
+
+    /**
+     * Build a URL-safe slug that is unique across menu_categories. Appends an
+     * incrementing suffix ("cold-brew-2") when the base slug is already taken so
+     * two categories with the same/similar name never collide on the unique index.
+     */
+    private function uniqueSlug(string $name, ?int $ignoreId = null): string
+    {
+        $base = Str::slug($name) ?: 'category';
+        $slug = $base;
+        $n = 1;
+
+        while (
+            MenuCategory::where('slug', $slug)
+                ->when($ignoreId, fn ($q) => $q->where('id', '!=', $ignoreId))
+                ->exists()
+        ) {
+            $slug = $base . '-' . (++$n);
+        }
+
+        return $slug;
     }
 
     // Route-bound parameter is named $category because the apiResource route is
@@ -56,7 +78,7 @@ class MenuCategoryController extends Controller
         ]);
 
         if (isset($data['name'])) {
-            $data['slug'] = Str::slug($data['name']);
+            $data['slug'] = $this->uniqueSlug($data['name'], $category->id);
         }
 
         $category->update($data);

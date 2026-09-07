@@ -10,8 +10,10 @@ import LoadingState from "@/components/admin/LoadingState";
 import FormDrawer from "@/components/admin/FormDrawer";
 import ConfirmDialog from "@/components/admin/ConfirmDialog";
 import Toast from "@/components/admin/Toast";
+import ImageCropper from "@/components/admin/ImageCropper";
 import { IconEdit, IconUsers, IconChevronLeft, IconChevronRight, IconTrash } from "@/components/admin/Icon";
-import { admin as adminApi, revalidate } from "@/lib/api";
+import { admin as adminApi, revalidate, type CropRect } from "@/lib/api";
+import { optimized, cropped, parseCrop } from "@/lib/cloudinary";
 import { getToken } from "@/contexts/AuthContext";
 
 // ── Default fallback values (shown before content loads) ──────────────────
@@ -86,11 +88,15 @@ export default function AdminAboutPage() {
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [removeHero, setRemoveHero] = useState(false);
   const [savingHero, setSavingHero] = useState(false);
+  const [heroCrop, setHeroCrop] = useState<CropRect | null>(null);
+  const [cropOpen, setCropOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Team drawer state
   const [teamSlot, setTeamSlot] = useState<TeamSlot | null>(null);
   const [clearSlot, setClearSlot] = useState<TeamSlot | null>(null);
+  // Per-slot crop metadata (stored in page_contents under *_photo_crop keys).
+  const [teamCrops, setTeamCrops] = useState<Record<TeamSlot, CropRect | null>>({ 1: null, 2: null, 3: null });
 
   useEffect(() => {
     if (!token) return;
@@ -101,6 +107,12 @@ export default function AdminAboutPage() {
           if (data[k] !== null && data[k] !== undefined) merged[k] = data[k] ?? "";
         }
         setForm(merged);
+        setHeroCrop(parseCrop(data.hero_image_crop));
+        setTeamCrops({
+          1: parseCrop(data.team_member_1_photo_crop),
+          2: parseCrop(data.team_member_2_photo_crop),
+          3: parseCrop(data.team_member_3_photo_crop),
+        });
       })
       .catch(() => setToast({ kind: "error", message: "Could not load page content." }))
       .finally(() => setLoading(false));
@@ -142,11 +154,13 @@ export default function AdminAboutPage() {
         const updated = await adminApi.pageContent.removeImage(token, "about");
         setForm(f => ({ ...f, hero_image_url: updated.hero_image_url ?? "" }));
         setRemoveHero(false);
+        setHeroCrop(null);
         showMsg("success", "Hero image removed");
       } else if (imageFile) {
         const updated = await adminApi.pageContent.uploadImage(token, "about", imageFile);
         setForm(f => ({ ...f, hero_image_url: updated.hero_image_url ?? "" }));
         setImageFile(null);
+        setHeroCrop(null); // server cleared the crop; mirror that locally
         if (fileInputRef.current) fileInputRef.current.value = "";
         showMsg("success", "Hero image updated");
       }
@@ -158,7 +172,28 @@ export default function AdminAboutPage() {
     }
   };
 
-  const currentHeroUrl = removeHero ? null : (imagePreviewUrl ?? (form.hero_image_url || null));
+  const currentHeroUrl = removeHero
+    ? null
+    : imagePreviewUrl
+      ? imagePreviewUrl
+      : form.hero_image_url
+        ? cropped(form.hero_image_url, heroCrop, "f_auto,q_auto,w_400,c_limit")
+        : null;
+
+  // Persist the hero crop rect on its own via the text-content endpoint
+  // (the key doesn't end in _url, so it round-trips through update()).
+  const saveHeroCrop = async (crop: CropRect | null) => {
+    if (!token) return;
+    setHeroCrop(crop);
+    setCropOpen(false);
+    try {
+      await adminApi.pageContent.update(token, "about", { hero_image_crop: crop ? JSON.stringify(crop) : "" });
+      await revalidate(["/about"]);
+      showMsg("success", "Crop saved");
+    } catch (e) {
+      showMsg("error", e instanceof Error ? e.message : "Could not save crop.");
+    }
+  };
 
   // ── Team helpers ──────────────────────────────────────────────────────
   const teamMember = (n: TeamSlot) => ({
@@ -281,6 +316,16 @@ export default function AdminAboutPage() {
                       {imageFile ? "Change file…" : "Upload image"}
                     </span>
                   </label>
+                  {form.hero_image_url && !imageFile && !removeHero && (
+                    <button
+                      type="button"
+                      onClick={() => setCropOpen(true)}
+                      className="text-xs font-semibold"
+                      style={{ color: "var(--admin-accent)" }}
+                    >
+                      {heroCrop ? "Adjust crop / position" : "Crop / reposition"}
+                    </button>
+                  )}
                   {(form.hero_image_url || imageFile) && !removeHero && (
                     <button
                       type="button"
@@ -441,7 +486,7 @@ export default function AdminAboutPage() {
                       >
                         {m.photo ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={m.photo} alt={m.name}
+                          <img src={cropped(m.photo, teamCrops[n], "f_auto,q_auto,c_fill,w_112,h_112")!} alt={m.name}
                                style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-base font-bold"
@@ -629,6 +674,7 @@ export default function AdminAboutPage() {
         <TeamMemberDrawer
           slot={teamSlot}
           initial={teamMember(teamSlot)}
+          initialCrop={teamCrops[teamSlot]}
           onClose={() => setTeamSlot(null)}
           onSaveLocal={(name, role, bio) => {
             setForm(f => ({
@@ -642,7 +688,10 @@ export default function AdminAboutPage() {
           }}
           onPhotoUploaded={url => {
             setForm(f => ({ ...f, [`team_member_${teamSlot}_photo_url`]: url }));
+            // A new/removed photo clears its crop server-side; mirror that here.
+            setTeamCrops(c => ({ ...c, [teamSlot]: null }));
           }}
+          onCropSaved={crop => setTeamCrops(c => ({ ...c, [teamSlot]: crop }))}
           onError={msg => showMsg("error", msg)}
         />
       )}
@@ -659,6 +708,19 @@ export default function AdminAboutPage() {
       />
 
       {toast && <Toast kind={toast.kind} message={toast.message} onDismiss={() => setToast(null)} />}
+
+      {cropOpen && form.hero_image_url && (
+        <ImageCropper
+          src={optimized(form.hero_image_url, "f_auto,q_auto,w_1400,c_limit")!}
+          aspect={3 / 2}
+          cropShape="rect"
+          initialCrop={heroCrop}
+          title="Reposition hero image"
+          description="Choose the focal area shown behind the heading · saved on apply"
+          onCancel={() => setCropOpen(false)}
+          onSave={saveHeroCrop}
+        />
+      )}
     </AdminLayout>
   );
 }
@@ -750,13 +812,15 @@ function BilingualField({
 /* ──────────────────────────────────────────────────────────────────────── */
 
 function TeamMemberDrawer({
-  slot, initial, onClose, onSaveLocal, onPhotoUploaded, onError,
+  slot, initial, initialCrop, onClose, onSaveLocal, onPhotoUploaded, onCropSaved, onError,
 }: {
   slot: TeamSlot;
   initial: { name: string; role: string; bio: string; photo: string };
+  initialCrop: CropRect | null;
   onClose: () => void;
   onSaveLocal: (name: string, role: string, bio: string) => void;
   onPhotoUploaded: (url: string) => void;
+  onCropSaved: (crop: CropRect | null) => void;
   onError: (msg: string) => void;
 }) {
   const [name, setName] = useState(initial.name);
@@ -768,6 +832,8 @@ function TeamMemberDrawer({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [removePhoto, setRemovePhoto] = useState(false);
   const [photoSaving, setPhotoSaving] = useState(false);
+  const [crop, setCrop] = useState<CropRect | null>(initialCrop);
+  const [cropOpen, setCropOpen] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -777,7 +843,14 @@ function TeamMemberDrawer({
     return () => URL.revokeObjectURL(url);
   }, [photoFile]);
 
-  const currentPhoto = removePhoto ? null : (previewUrl ?? (initial.photo || null));
+  // Show the stored photo with its crop applied; a pending local file previews raw.
+  const currentPhoto = removePhoto
+    ? null
+    : previewUrl
+      ? previewUrl
+      : initial.photo
+        ? cropped(initial.photo, crop, "f_auto,q_auto,c_fill,w_144,h_144")
+        : null;
   const hasStoredPhoto = !!initial.photo;
 
   const handleSavePhoto = async () => {
@@ -790,11 +863,13 @@ function TeamMemberDrawer({
         const updated = await adminApi.pageContent.removeImageByKey(token, "about", key);
         onPhotoUploaded(updated[`team_member_${slot}_photo_url`] ?? "");
         setRemovePhoto(false);
+        setCrop(null);
         await revalidate(["/about"]);
       } else if (photoFile) {
         const updated = await adminApi.pageContent.uploadImageByKey(token, "about", key, photoFile);
         onPhotoUploaded(updated[`team_member_${slot}_photo_url`] ?? "");
         setPhotoFile(null);
+        setCrop(null);
         if (fileRef.current) fileRef.current.value = "";
         await revalidate(["/about"]);
       }
@@ -805,7 +880,23 @@ function TeamMemberDrawer({
     }
   };
 
+  // Persist the crop rect via the text-content endpoint (key doesn't end in _url).
+  const handleSaveCrop = async (next: CropRect | null) => {
+    const token = getToken();
+    setCrop(next);
+    setCropOpen(false);
+    if (!token) return;
+    try {
+      await adminApi.pageContent.update(token, "about", { [`team_member_${slot}_photo_crop`]: next ? JSON.stringify(next) : "" });
+      onCropSaved(next);
+      await revalidate(["/about"]);
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "Could not save crop");
+    }
+  };
+
   return (
+   <>
     <FormDrawer
       open
       onClose={onClose}
@@ -878,6 +969,14 @@ function TeamMemberDrawer({
                     {photoFile ? "Change…" : "Upload"}
                   </span>
                 </label>
+                {hasStoredPhoto && !photoFile && !removePhoto && (
+                  <button type="button"
+                          onClick={() => setCropOpen(true)}
+                          className="text-xs font-semibold"
+                          style={{ color: "var(--admin-accent)" }}>
+                    {crop ? "Adjust crop" : "Crop / reposition"}
+                  </button>
+                )}
                 {(hasStoredPhoto || photoFile) && !removePhoto && (
                   <button type="button"
                           onClick={() => { setRemovePhoto(true); setPhotoFile(null); }}
@@ -932,5 +1031,19 @@ function TeamMemberDrawer({
         </div>
       </div>
     </FormDrawer>
+
+    {cropOpen && initial.photo && (
+      <ImageCropper
+        src={optimized(initial.photo, "f_auto,q_auto,w_800,c_limit")!}
+        aspect={4 / 5}
+        cropShape="rect"
+        initialCrop={crop}
+        title="Reposition team photo"
+        description="Portrait crop (4:5) · drag to frame the face · saved on apply"
+        onCancel={() => setCropOpen(false)}
+        onSave={handleSaveCrop}
+      />
+    )}
+   </>
   );
 }

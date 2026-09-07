@@ -5,7 +5,7 @@
 // The smaller named exports (badges, CTA, footer) are also used directly in page.tsx.
 import Link from "next/link";
 import { useLang } from "@/contexts/LangContext";
-import { optimized } from "@/lib/cloudinary";
+import { optimized, cropped, parseCrop } from "@/lib/cloudinary";
 import type { PageContent } from "@/lib/api";
 
 // ── Internal layout helpers (client-safe, no hooks) ────────────────────────
@@ -42,7 +42,7 @@ function SectionBody({ children }: { children: React.ReactNode }) {
   );
 }
 
-function BaristaCard({ name, role, photoUrl }: { name: string; role: string; photoUrl?: string | null }) {
+function BaristaCard({ name, role, photoUrl, photoCrop }: { name: string; role: string; photoUrl?: string | null; photoCrop?: import("@/lib/cloudinary").CropRect | null }) {
   // Portrait aspect (4:5) gives faces more vertical headroom than a square crop —
   // important when admins upload natural portrait photos. Cloudinary g_face still
   // anchors the crop to the detected face center.
@@ -61,7 +61,9 @@ function BaristaCard({ name, role, photoUrl }: { name: string; role: string; pho
       {photoUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={optimized(photoUrl, "f_auto,q_auto,c_fill,w_480,h_600,g_face")!}
+          src={(photoCrop
+            ? cropped(photoUrl, photoCrop, "f_auto,q_auto,c_fill,w_480,h_600")
+            : optimized(photoUrl, "f_auto,q_auto,c_fill,w_480,h_600,g_face"))!}
           alt={`Photo of ${name}, ${role}`}
           className="kc-team-img"
           style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }}
@@ -383,11 +385,13 @@ export function AboutPageContent({ content }: { content: PageContent }) {
       name: val(`team_member_${n}_name`),
       role: val(`team_member_${n}_role`),
       photoUrl: (content[`team_member_${n}_photo_url`] ?? null) as string | null,
+      photoCrop: parseCrop(content[`team_member_${n}_photo_crop`]),
     }))
     .filter(m => m.name);
 
   const addressLines = val("location_address").split("\n").filter(Boolean);
   const heroImageUrl = (content.hero_image_url ?? null) as string | null;
+  const heroImageCrop = parseCrop(content.hero_image_crop);
 
   return (
     <>
@@ -399,7 +403,7 @@ export function AboutPageContent({ content }: { content: PageContent }) {
         {heroImageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={optimized(heroImageUrl, "f_auto,q_auto,w_1600,c_limit")!}
+            src={cropped(heroImageUrl, heroImageCrop, "f_auto,q_auto,w_1600,c_limit")!}
             alt="About hero"
             className="kc-hero-bg-motion"
             style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", zIndex: 0 }}
@@ -485,8 +489,8 @@ export function AboutPageContent({ content }: { content: PageContent }) {
           <SectionHeading>{val("team_heading")}</SectionHeading>
           <SectionBody>{val("team_subtext")}</SectionBody>
           <div className="grid sm:grid-cols-3 gap-5 mt-10">
-            {teamMembers.map(({ name, role, photoUrl }) => (
-              <BaristaCard key={name} name={name} role={role} photoUrl={photoUrl} />
+            {teamMembers.map(({ name, role, photoUrl, photoCrop }) => (
+              <BaristaCard key={name} name={name} role={role} photoUrl={photoUrl} photoCrop={photoCrop} />
             ))}
           </div>
         </Section>

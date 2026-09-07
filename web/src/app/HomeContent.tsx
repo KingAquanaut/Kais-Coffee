@@ -266,69 +266,65 @@ export function SpotlightSection({ item, label }: { item: MenuItem; label?: stri
   const badgeText = (label && label.trim()) ? label.trim() : strings.home.spotlightBadge;
 
   return (
-    <section className="px-6 pt-20 pb-6">
+    <section className="px-4 sm:px-6 pt-20 pb-6">
       <div className="max-w-3xl mx-auto">
         <div
-          className="kc-card kc-lift overflow-hidden"
+          className="kc-card kc-lift kc-spotlight-grid"
           style={{
             background: "linear-gradient(135deg, #fff 0%, var(--kc-cream) 100%)",
             border: "1.5px solid var(--kc-gold-lt)",
-            display: "grid",
-            gridTemplateColumns: "minmax(0, 1fr)",
           }}
         >
-          <div
-            className="grid items-center gap-6 p-6 sm:p-8"
-            style={{ gridTemplateColumns: "minmax(120px, 200px) minmax(0, 1fr)" }}
+          {/* Badge — above image on mobile, top of the text column on desktop */}
+          <span
+            className="kc-spotlight-badge kc-badge"
+            style={{
+              background: "linear-gradient(135deg, #f0dcaa 0%, #d4a84b 100%)",
+              color: "#fff",
+              fontSize: "0.6875rem",
+              padding: "0.2rem 0.85rem",
+              display: "inline-flex",
+              boxShadow: "0 2px 8px rgba(184,150,46,0.25)",
+            }}
           >
-            {/* Image */}
-            <div className="flex items-center justify-center">
-              <ItemImage name={name} imageUrl={item.image_url} size={180} />
-            </div>
+            ✦ {badgeText}
+          </span>
 
-            {/* Content */}
-            <div className="min-w-0 flex flex-col gap-3">
-              <span
-                className="kc-badge"
-                style={{
-                  background: "linear-gradient(135deg, #f0dcaa 0%, #d4a84b 100%)",
-                  color: "#fff",
-                  fontSize: "0.6875rem",
-                  padding: "0.2rem 0.85rem",
-                  display: "inline-flex",
-                  alignSelf: "flex-start",
-                  boxShadow: "0 2px 8px rgba(184,150,46,0.25)",
-                }}
-              >
-                ✦ {badgeText}
-              </span>
-              <h2
-                className="font-bold leading-tight"
-                style={{
-                  fontFamily: "var(--font-script)",
-                  fontSize: "clamp(1.5rem, 4vw, 2.25rem)",
-                  color: "var(--kc-blue-deep)",
-                }}
-              >
-                {name}
-              </h2>
-              {description && (
-                <p
-                  className="text-sm sm:text-base"
-                  style={{ color: "var(--kc-muted)", lineHeight: 1.7, maxWidth: "52ch" }}
-                >
-                  {description}
-                </p>
-              )}
-              <div className="flex items-center justify-between gap-3 mt-2 flex-wrap">
-                <p className="font-bold" style={{ fontSize: "1.05rem", color: "var(--kc-gold)" }}>
-                  {priceLabel}
-                </p>
-                <Link href="/menu" className="kc-btn kc-btn-gold kc-btn-sm">
-                  {strings.home.spotlightCta}
-                </Link>
-              </div>
-            </div>
+          {/* Image */}
+          <div className="kc-spotlight-image">
+            <ItemImage name={name} imageUrl={item.image_url} crop={item.image_crop} size={160} />
+          </div>
+
+          {/* Title */}
+          <h2
+            className="kc-spotlight-title font-bold leading-tight"
+            style={{
+              fontFamily: "var(--font-script)",
+              fontSize: "clamp(1.5rem, 4vw, 2.25rem)",
+              color: "var(--kc-blue-deep)",
+            }}
+          >
+            {name}
+          </h2>
+
+          {/* Description */}
+          {description && (
+            <p
+              className="kc-spotlight-desc text-sm sm:text-base"
+              style={{ color: "var(--kc-muted)", lineHeight: 1.7, maxWidth: "52ch" }}
+            >
+              {description}
+            </p>
+          )}
+
+          {/* Price + CTA */}
+          <div className="kc-spotlight-footer">
+            <p className="font-bold" style={{ fontSize: "1.05rem", color: "var(--kc-gold)" }}>
+              {priceLabel}
+            </p>
+            <Link href="/menu" className="kc-btn kc-btn-gold kc-btn-sm">
+              {strings.home.spotlightCta}
+            </Link>
           </div>
         </div>
       </div>
@@ -393,7 +389,7 @@ export function SeasonalSection({ items }: { items: MenuItem[] }) {
                 }}
               >
                 <div style={{ flexShrink: 0 }}>
-                  <ItemImage name={name} imageUrl={item.image_url} size={80} />
+                  <ItemImage name={name} imageUrl={item.image_url} crop={item.image_crop} size={80} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p

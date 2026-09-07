@@ -1,7 +1,11 @@
 /**
  * Kai's Coffee — API client
  */
+import type { CropRect } from "./cloudinary";
+
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000/api/v1";
+
+export type { CropRect };
 
 // ── Types ──────────────────────────────────────────────────────────────────
 export type User = {
@@ -23,7 +27,7 @@ export type MenuItemVariant = {
 };
 export type MenuItem = {
   id: number; menu_category_id: number; name: string; name_es: string | null; slug: string; description: string | null; description_es: string | null;
-  price: string; image_url: string | null; is_active: boolean; is_featured: boolean; is_seasonal: boolean; sort_order: number;
+  price: string; image_url: string | null; image_crop: CropRect | null; is_active: boolean; is_featured: boolean; is_seasonal: boolean; sort_order: number;
   category?: { id: number; name: string; slug: string };
   variants?: MenuItemVariant[];
   active_variants?: MenuItemVariant[];
