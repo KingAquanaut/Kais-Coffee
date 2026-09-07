@@ -26,6 +26,13 @@
         <env name="DB_CONNECTION" value="sqlite"/>
         <env name="DB_DATABASE" value=":memory:"/>
         <env name="DB_URL" value=""/>
+        <!-- Dummy credentials so the Cloudinary client can be constructed.
+             UploadService builds it eagerly and PageContentController injects
+             that service in its constructor, so without this every route on
+             that controller 500s wherever CLOUDINARY_URL is unset (CI copies
+             .env.example, which ships it empty). No test uploads anything, so
+             these are never used against the network. -->
+        <env name="CLOUDINARY_URL" value="cloudinary://test_key:test_secret@test-cloud"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
