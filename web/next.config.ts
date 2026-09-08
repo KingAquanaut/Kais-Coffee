@@ -4,7 +4,12 @@ import type { NextConfig } from "next";
 const withPWA = require("next-pwa")({
   dest: "public",
   register: true,
-  skipWaiting: true,
+  // Deliberately false. With skipWaiting a new worker activates and claims
+  // clients the instant it installs, so it never reaches the "waiting" state —
+  // there is no moment at which to ask the user before swapping them onto a new
+  // build. Letting it wait is what makes the update prompt possible; the app
+  // posts SKIP_WAITING only once the user taps Refresh Now.
+  skipWaiting: false,
   disable: process.env.NODE_ENV === "development",
 
   // NOTE: `fallbacks.document` was removed because next-pwa@5 crashes on
@@ -129,9 +134,26 @@ function buildRemotePatterns() {
   return patterns;
 }
 
+/**
+ * Short, non-sensitive build identifier shown in the update prompt.
+ *
+ * Prefers the 7-char commit SHA Vercel exposes at build time, falling back to a
+ * UTC build date locally. Deliberately nothing else — no branch, no CI job or
+ * environment detail — and it is inlined into the client bundle, so it must
+ * stay safe to display publicly.
+ */
+function buildId(): string {
+  const sha = process.env.VERCEL_GIT_COMMIT_SHA;
+  if (sha) return sha.slice(0, 7);
+  return new Date().toISOString().slice(0, 16).replace("T", " ") + " UTC";
+}
+
 const nextConfig: NextConfig = {
   output: "standalone",
   turbopack: {},
+  env: {
+    NEXT_PUBLIC_BUILD_ID: buildId(),
+  },
   images: {
     remotePatterns: buildRemotePatterns(),
   },
