@@ -1,7 +1,7 @@
 "use client";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { IconMenu, IconChevronRight, IconQr, IconPlus } from "./Icon";
+import { IconMenu, IconChevronRight, IconQr, IconPlus, IconExternal } from "./Icon";
 import { PURCHASES_ENABLED } from "@/lib/features";
 
 type Crumb = { label: string; href?: string };
@@ -84,6 +84,24 @@ export default function AdminTopbar({ onMobileMenuOpen }: Props) {
 
       {/* Quick actions */}
       <div className="flex items-center gap-2">
+        {/* Public site. A normal link — the auth token stays in localStorage,
+            so returning to /admin is still signed in. Shown here as well as in
+            the sidebar so it stays reachable on mobile, where the sidebar is
+            behind the hamburger. */}
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 px-3 h-9 rounded-lg text-sm font-semibold"
+          style={{
+            background: "var(--admin-surface)",
+            color: "var(--admin-ink)",
+            border: "1px solid var(--admin-border-strong)",
+            textDecoration: "none",
+          }}
+          title="View the public site"
+        >
+          <IconExternal size={16} />
+          <span className="hidden sm:inline">View site</span>
+        </Link>
         <Link
           href="/admin/scan"
           className="hidden sm:inline-flex items-center gap-1.5 px-3 h-9 rounded-lg text-sm font-semibold"

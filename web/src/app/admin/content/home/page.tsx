@@ -98,11 +98,21 @@ export default function AdminHomePage() {
         setHeroCrop(null);
         setToast({ kind: "success", message: "Hero image removed" });
       } else if (imageFile) {
+        // Crop drawn on the pending file, before it had a Cloudinary URL.
+        const pendingCrop = heroCrop;
         const updated = await adminApi.pageContent.uploadImage(token, "home", imageFile);
         setForm(f => ({ ...f, hero_image_url: updated.hero_image_url ?? "" }));
         setImageFile(null);
-        setHeroCrop(null); // server cleared the crop; mirror that locally
         if (fileInputRef.current) fileInputRef.current.value = "";
+        // The upload endpoint clears any stored crop. Re-send the one the admin
+        // just drew on this exact file, so it survives the upload.
+        if (pendingCrop) {
+          await adminApi.pageContent.update(token, "home", {
+            hero_image_crop: JSON.stringify(pendingCrop),
+          });
+        } else {
+          setHeroCrop(null); // server cleared it; mirror that locally
+        }
         setToast({ kind: "success", message: "Hero image updated" });
       }
       await revalidate(["/"]);
@@ -121,6 +131,13 @@ export default function AdminHomePage() {
     if (!token) return;
     setHeroCrop(crop);
     setCropOpen(false);
+    // While a replacement file is pending, the stored image is still the old
+    // one — persisting now would crop the wrong photo. Hold the rect locally;
+    // handleSaveHero sends it straight after the upload.
+    if (imageFile) {
+      setToast({ kind: "success", message: "Crop applied — save the image to publish it" });
+      return;
+    }
     try {
       await adminApi.pageContent.update(token, "home", { hero_image_crop: crop ? JSON.stringify(crop) : "" });
       await revalidate(["/"]);
@@ -138,7 +155,9 @@ export default function AdminHomePage() {
       return;
     }
     setImageFile(file);
-    if (file) setRemoveHero(false);
+    // A crop belongs to the photo it was drawn on, so drop it when a different
+    // file is picked. The admin can re-crop the pending file before uploading.
+    if (file) { setRemoveHero(false); setHeroCrop(null); }
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -213,7 +232,7 @@ export default function AdminHomePage() {
                     {imageFile ? "Change file…" : "Upload image"}
                   </span>
                 </label>
-                {form.hero_image_url && !imageFile && !removeHero && (
+                {(imagePreviewUrl || form.hero_image_url) && !removeHero && (
                   <button type="button"
                           onClick={() => setCropOpen(true)}
                           className="text-xs font-semibold"
@@ -344,9 +363,9 @@ export default function AdminHomePage() {
 
       {toast && <Toast kind={toast.kind} message={toast.message} onDismiss={() => setToast(null)} />}
 
-      {cropOpen && form.hero_image_url && (
+      {cropOpen && (imagePreviewUrl || form.hero_image_url) && (
         <ImageCropper
-          src={optimized(form.hero_image_url, "f_auto,q_auto,w_1400,c_limit")!}
+          src={imagePreviewUrl ?? optimized(form.hero_image_url, "f_auto,q_auto,w_1400,c_limit")!}
           aspect={16 / 9}
           cropShape="rect"
           initialCrop={heroCrop}

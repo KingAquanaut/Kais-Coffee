@@ -704,6 +704,13 @@ function ItemDrawer({
 
       if (imageFile && saved.id) {
         saved = await adminApi.menu.uploadItemImage(token, saved.id, imageFile);
+        // uploadItemImage deliberately clears image_crop (a crop saved against
+        // the previous photo is meaningless for a new one). When the admin
+        // cropped this same pending file before saving, re-apply that rect
+        // afterwards — otherwise it is silently discarded.
+        if (cropRect) {
+          saved = await adminApi.menu.updateItem(token, saved.id, { image_crop: cropRect });
+        }
       }
 
       onSaved(saved, !item);
@@ -788,9 +795,9 @@ function ItemDrawer({
                   {imageFile.name}
                 </p>
               )}
-              {/* Reposition/crop is only available for an already-uploaded image
-                  (a pending local file must be saved first so Cloudinary has it). */}
-              {item?.image_url && !imageFile && !removeImage && (
+              {/* Available for a stored image and for a not-yet-uploaded local
+                  file alike — the crop rect is resolution-independent. */}
+              {(imagePreviewUrl || item?.image_url) && !removeImage && (
                 <button
                   type="button"
                   onClick={() => setCropOpen(true)}
@@ -941,9 +948,12 @@ function ItemDrawer({
       </div>
     </FormDrawer>
 
-    {cropOpen && item?.image_url && (
+    {/* A pending local file is cropped from its object URL. The rect is stored
+        as fractions of the image, so it stays correct once that same file is
+        uploaded to Cloudinary — no need to make the admin save and reopen. */}
+    {cropOpen && (imagePreviewUrl ?? item?.image_url) && (
       <ImageCropper
-        src={optimized(item.image_url, "f_auto,q_auto,w_1000,c_limit")!}
+        src={imagePreviewUrl ?? optimized(item!.image_url, "f_auto,q_auto,w_1000,c_limit")!}
         aspect={1}
         cropShape="round"
         initialCrop={cropRect}

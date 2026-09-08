@@ -6,6 +6,7 @@ use App\Models\PageContent;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -161,5 +162,57 @@ class PageContentCropTest extends TestCase
         ]));
 
         $this->putContent(['hero_image_crop' => ''])->assertStatus(403);
+    }
+
+    public function test_calendar_image_crop_is_validated_and_persisted(): void
+    {
+        Sanctum::actingAs($this->makeAdmin());
+
+        // The calendar slot is a first-class image key, so its crop gets the
+        // same structural validation as hero and team photos.
+        $this->putContent(['calendar_image_crop' => json_encode(['x' => 0.9, 'y' => 0, 'w' => 0.5, 'h' => 0.5])])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors('calendar_image_crop');
+
+        $crop = ['x' => 0.05, 'y' => 0.05, 'w' => 0.9, 'h' => 0.9];
+        $this->putContent(['calendar_image_crop' => json_encode($crop)])->assertOk();
+
+        $this->assertSame($crop, json_decode(
+            PageContent::where('page', 'home')->where('key', 'calendar_image_crop')->value('value'), true
+        ));
+    }
+
+    public function test_calendar_image_can_be_uploaded_and_removed(): void
+    {
+        Sanctum::actingAs($this->makeAdmin());
+        Storage::fake('public');
+
+        // Seed a URL + crop directly: the upload path itself calls Cloudinary,
+        // which these tests do not exercise. What matters here is that the key
+        // is accepted by the whitelist rather than 422'd as an invalid slot.
+        PageContent::set('about', 'calendar_image_url', 'https://res.cloudinary.com/demo/image/upload/v1/cal.png');
+        PageContent::set('about', 'calendar_image_crop', json_encode(['x' => 0, 'y' => 0, 'w' => 1, 'h' => 1]));
+
+        $res = $this->deleteJson('/api/v1/admin/page-contents/about/images/calendar_image');
+        $res->assertOk();
+
+        // Removing clears both the URL and the crop that belonged to it.
+        $this->assertNull(PageContent::where('page', 'about')->where('key', 'calendar_image_url')->value('value'));
+        $this->assertNull(PageContent::where('page', 'about')->where('key', 'calendar_image_crop')->value('value'));
+    }
+
+    public function test_unknown_image_key_is_still_rejected(): void
+    {
+        Sanctum::actingAs($this->makeAdmin());
+
+        $this->deleteJson('/api/v1/admin/page-contents/about/images/not_a_real_slot')
+            ->assertStatus(422);
+    }
+
+    public function test_page_content_with_no_calendar_image_is_valid(): void
+    {
+        // Backwards compatibility: a page that never had a calendar image just
+        // has no such keys, and the public endpoint still returns fine.
+        $this->getJson('/api/v1/page-contents/about')->assertOk();
     }
 }

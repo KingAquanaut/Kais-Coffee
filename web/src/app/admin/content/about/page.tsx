@@ -89,6 +89,10 @@ export default function AdminAboutPage() {
   const [removeHero, setRemoveHero] = useState(false);
   const [savingHero, setSavingHero] = useState(false);
   const [heroCrop, setHeroCrop] = useState<CropRect | null>(null);
+  // Schedule / calendar graphic for the "Where to find us" section. Stored in
+  // page_contents under calendar_image_url / calendar_image_crop.
+  const [calendarUrl, setCalendarUrl] = useState<string | null>(null);
+  const [calendarCrop, setCalendarCrop] = useState<CropRect | null>(null);
   const [cropOpen, setCropOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -108,6 +112,8 @@ export default function AdminAboutPage() {
         }
         setForm(merged);
         setHeroCrop(parseCrop(data.hero_image_crop));
+        setCalendarUrl((data.calendar_image_url as string | null) ?? null);
+        setCalendarCrop(parseCrop(data.calendar_image_crop));
         setTeamCrops({
           1: parseCrop(data.team_member_1_photo_crop),
           2: parseCrop(data.team_member_2_photo_crop),
@@ -157,11 +163,20 @@ export default function AdminAboutPage() {
         setHeroCrop(null);
         showMsg("success", "Hero image removed");
       } else if (imageFile) {
+        const pendingCrop = heroCrop; // drawn on the file before it had a URL
         const updated = await adminApi.pageContent.uploadImage(token, "about", imageFile);
         setForm(f => ({ ...f, hero_image_url: updated.hero_image_url ?? "" }));
         setImageFile(null);
-        setHeroCrop(null); // server cleared the crop; mirror that locally
         if (fileInputRef.current) fileInputRef.current.value = "";
+        // The upload endpoint clears any stored crop — re-send the one just
+        // drawn on this exact file so it survives.
+        if (pendingCrop) {
+          await adminApi.pageContent.update(token, "about", {
+            hero_image_crop: JSON.stringify(pendingCrop),
+          });
+        } else {
+          setHeroCrop(null);
+        }
         showMsg("success", "Hero image updated");
       }
       await revalidate(["/about"]);
@@ -186,6 +201,12 @@ export default function AdminAboutPage() {
     if (!token) return;
     setHeroCrop(crop);
     setCropOpen(false);
+    // A replacement file is pending — the stored image is still the old one, so
+    // hold the rect locally and let handleSaveHero send it after the upload.
+    if (imageFile) {
+      showMsg("success", "Crop applied — save the image to publish it");
+      return;
+    }
     try {
       await adminApi.pageContent.update(token, "about", { hero_image_crop: crop ? JSON.stringify(crop) : "" });
       await revalidate(["/about"]);
@@ -299,7 +320,8 @@ export default function AdminAboutPage() {
                       return;
                     }
                     setImageFile(f);
-                    if (f) setRemoveHero(false);
+                    // A crop belongs to the photo it was drawn on.
+                    if (f) { setRemoveHero(false); setHeroCrop(null); }
                     if (fileInputRef.current) fileInputRef.current.value = "";
                   }}
                 />
@@ -316,7 +338,7 @@ export default function AdminAboutPage() {
                       {imageFile ? "Change file…" : "Upload image"}
                     </span>
                   </label>
-                  {form.hero_image_url && !imageFile && !removeHero && (
+                  {(imagePreviewUrl || form.hero_image_url) && !removeHero && (
                     <button
                       type="button"
                       onClick={() => setCropOpen(true)}
@@ -620,6 +642,14 @@ export default function AdminAboutPage() {
               </p>
             )}
           </div>
+
+          <CalendarImageSlot
+            imageUrl={calendarUrl}
+            crop={calendarCrop}
+            onChanged={(url, nextCrop) => { setCalendarUrl(url); setCalendarCrop(nextCrop); }}
+            onError={msg => showMsg("error", msg)}
+            onSuccess={msg => showMsg("success", msg)}
+          />
         </Section>
 
         {/* ── Contact ────────────────────────────────────────────────── */}
@@ -709,9 +739,9 @@ export default function AdminAboutPage() {
 
       {toast && <Toast kind={toast.kind} message={toast.message} onDismiss={() => setToast(null)} />}
 
-      {cropOpen && form.hero_image_url && (
+      {cropOpen && (imagePreviewUrl || form.hero_image_url) && (
         <ImageCropper
-          src={optimized(form.hero_image_url, "f_auto,q_auto,w_1400,c_limit")!}
+          src={imagePreviewUrl ?? optimized(form.hero_image_url, "f_auto,q_auto,w_1400,c_limit")!}
           aspect={3 / 2}
           cropShape="rect"
           initialCrop={heroCrop}
@@ -866,11 +896,20 @@ function TeamMemberDrawer({
         setCrop(null);
         await revalidate(["/about"]);
       } else if (photoFile) {
+        const pendingCrop = crop; // drawn on the file before it had a URL
         const updated = await adminApi.pageContent.uploadImageByKey(token, "about", key, photoFile);
         onPhotoUploaded(updated[`team_member_${slot}_photo_url`] ?? "");
         setPhotoFile(null);
-        setCrop(null);
         if (fileRef.current) fileRef.current.value = "";
+        // Upload clears any stored crop — re-send the one drawn on this file.
+        if (pendingCrop) {
+          await adminApi.pageContent.update(token, "about", {
+            [`team_member_${slot}_photo_crop`]: JSON.stringify(pendingCrop),
+          });
+          onCropSaved(pendingCrop);
+        } else {
+          setCrop(null);
+        }
         await revalidate(["/about"]);
       }
     } catch (e) {
@@ -886,6 +925,9 @@ function TeamMemberDrawer({
     setCrop(next);
     setCropOpen(false);
     if (!token) return;
+    // A replacement photo is pending — persisting now would crop the old one.
+    // handleSavePhoto sends this rect straight after the upload.
+    if (photoFile) return;
     try {
       await adminApi.pageContent.update(token, "about", { [`team_member_${slot}_photo_crop`]: next ? JSON.stringify(next) : "" });
       onCropSaved(next);
@@ -953,7 +995,8 @@ function TeamMemberDrawer({
                     return;
                   }
                   setPhotoFile(f);
-                  if (f) setRemovePhoto(false);
+                  // A crop belongs to the photo it was drawn on.
+                  if (f) { setRemovePhoto(false); setCrop(null); }
                 }}
               />
               <div className="flex gap-2 flex-wrap">
@@ -969,7 +1012,7 @@ function TeamMemberDrawer({
                     {photoFile ? "Change…" : "Upload"}
                   </span>
                 </label>
-                {hasStoredPhoto && !photoFile && !removePhoto && (
+                {(previewUrl || hasStoredPhoto) && !removePhoto && (
                   <button type="button"
                           onClick={() => setCropOpen(true)}
                           className="text-xs font-semibold"
@@ -1032,9 +1075,9 @@ function TeamMemberDrawer({
       </div>
     </FormDrawer>
 
-    {cropOpen && initial.photo && (
+    {cropOpen && (previewUrl || initial.photo) && (
       <ImageCropper
-        src={optimized(initial.photo, "f_auto,q_auto,w_800,c_limit")!}
+        src={previewUrl ?? optimized(initial.photo, "f_auto,q_auto,w_800,c_limit")!}
         aspect={4 / 5}
         cropShape="rect"
         initialCrop={crop}
@@ -1045,5 +1088,220 @@ function TeamMemberDrawer({
       />
     )}
    </>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────── */
+/*  Schedule / Calendar image slot                                          */
+/* ──────────────────────────────────────────────────────────────────────── */
+
+/**
+ * Admin control for the "Where to find us" schedule graphic. Uses the same
+ * named-image-key endpoints as the team photos and the same ImageCropper, so
+ * the crop metadata model and Cloudinary rendering are unchanged.
+ *
+ * Uploads and removals apply immediately (they hit their own endpoints),
+ * matching how the hero and team photos already behave on this page.
+ */
+function CalendarImageSlot({
+  imageUrl, crop, onChanged, onError, onSuccess,
+}: {
+  imageUrl: string | null;
+  crop: CropRect | null;
+  onChanged: (url: string | null, crop: CropRect | null) => void;
+  onError: (msg: string) => void;
+  onSuccess: (msg: string) => void;
+}) {
+  const [file, setFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [cropOpen, setCropOpen] = useState(false);
+  // Crop drawn on a pending file, held until the upload gives it a URL.
+  const [pendingCrop, setPendingCrop] = useState<CropRect | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!file) { setPreviewUrl(null); return; }
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
+
+  const shownCrop = file ? pendingCrop : crop;
+  const displayUrl = previewUrl
+    ?? (imageUrl ? cropped(imageUrl, crop, "f_auto,q_auto,c_fill,w_640,h_360") : null);
+
+  const handleUpload = async () => {
+    const token = getToken();
+    if (!token || !file) return;
+    setSaving(true);
+    try {
+      const updated = await adminApi.pageContent.uploadImageByKey(token, "about", "calendar_image", file);
+      const url = (updated.calendar_image_url as string | null) ?? null;
+      // The upload endpoint clears any stored crop, so re-send the rect the
+      // admin drew on this exact file.
+      let nextCrop: CropRect | null = null;
+      if (pendingCrop) {
+        await adminApi.pageContent.update(token, "about", {
+          calendar_image_crop: JSON.stringify(pendingCrop),
+        });
+        nextCrop = pendingCrop;
+      }
+      onChanged(url, nextCrop);
+      setFile(null);
+      setPendingCrop(null);
+      if (fileRef.current) fileRef.current.value = "";
+      await revalidate(["/about"]);
+      onSuccess("Calendar image updated");
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "Could not save calendar image");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemove = async () => {
+    const token = getToken();
+    if (!token) return;
+    setSaving(true);
+    try {
+      await adminApi.pageContent.removeImageByKey(token, "about", "calendar_image");
+      onChanged(null, null);
+      await revalidate(["/about"]);
+      onSuccess("Calendar image removed");
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "Could not remove calendar image");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveCrop = async (next: CropRect) => {
+    setCropOpen(false);
+    // Pending file: hold the rect and let handleUpload persist it after upload.
+    if (file) { setPendingCrop(next); onSuccess("Crop applied — upload to publish it"); return; }
+    const token = getToken();
+    if (!token) return;
+    try {
+      await adminApi.pageContent.update(token, "about", {
+        calendar_image_crop: JSON.stringify(next),
+      });
+      onChanged(imageUrl, next);
+      await revalidate(["/about"]);
+      onSuccess("Crop saved");
+    } catch (e) {
+      onError(e instanceof Error ? e.message : "Could not save crop");
+    }
+  };
+
+  return (
+    <div>
+      <label className="admin-label">Schedule / Calendar Image</label>
+      <p className="text-xs mb-3" style={{ color: "var(--admin-ink-muted)" }}>
+        A graphic of upcoming pop-ups, private events or seasonal hours. Shown in
+        the Where to find us section at 16:9. Leave empty to show a placeholder.
+      </p>
+
+      <div className="flex flex-col sm:flex-row gap-4 sm:items-start">
+        {/* Preview */}
+        <div
+          className="shrink-0 rounded-lg overflow-hidden flex items-center justify-center"
+          style={{
+            width: 200, aspectRatio: "16 / 9",
+            border: "1px solid var(--admin-border)",
+            background: "var(--admin-surface)",
+          }}
+        >
+          {displayUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={displayUrl} alt="Calendar preview"
+                 style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          ) : (
+            <span className="text-xs" style={{ color: "var(--admin-ink-muted)" }}>No image</span>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-2 flex-1 min-w-0">
+          <input
+            ref={fileRef}
+            id="calendar-image"
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            className="hidden"
+            onChange={e => {
+              const f = e.target.files?.[0] ?? null;
+              if (f && f.size > 20 * 1024 * 1024) {
+                onError("File is too large — max 20 MB");
+                if (fileRef.current) fileRef.current.value = "";
+                return;
+              }
+              setFile(f);
+              setPendingCrop(null); // a crop belongs to the photo it was drawn on
+            }}
+          />
+          <div className="flex gap-2 flex-wrap items-center">
+            <label htmlFor="calendar-image" className="cursor-pointer">
+              <span
+                className="inline-flex items-center justify-center px-3 h-9 text-sm font-semibold rounded-lg"
+                style={{
+                  border: "1px solid var(--admin-border-strong)",
+                  background: "var(--admin-surface)",
+                  color: "var(--admin-ink)",
+                }}
+              >
+                {imageUrl ? "Replace image" : "Upload image"}
+              </span>
+            </label>
+            {file && (
+              <Button variant="primary" size="sm" onClick={handleUpload} loading={saving}>
+                Save image
+              </Button>
+            )}
+          </div>
+
+          {file && (
+            <p className="text-xs truncate" style={{ color: "var(--admin-ink-muted)" }}>{file.name}</p>
+          )}
+
+          <div className="flex gap-3 flex-wrap">
+            {(previewUrl || imageUrl) && (
+              <button type="button" onClick={() => setCropOpen(true)}
+                      className="text-xs font-semibold"
+                      style={{ color: "var(--admin-accent)" }}>
+                {shownCrop ? "Adjust crop / position" : "Crop / reposition"}
+              </button>
+            )}
+            {imageUrl && !file && (
+              <button type="button" onClick={handleRemove} disabled={saving}
+                      className="text-xs font-semibold"
+                      style={{ color: "var(--admin-danger)" }}>
+                Remove image
+              </button>
+            )}
+            {file && (
+              <button type="button"
+                      onClick={() => { setFile(null); setPendingCrop(null); if (fileRef.current) fileRef.current.value = ""; }}
+                      className="text-xs font-semibold underline"
+                      style={{ color: "var(--admin-ink-muted)" }}>
+                Cancel
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {cropOpen && (previewUrl || imageUrl) && (
+        <ImageCropper
+          src={previewUrl ?? optimized(imageUrl, "f_auto,q_auto,w_1400,c_limit")!}
+          aspect={16 / 9}
+          cropShape="rect"
+          initialCrop={shownCrop}
+          title="Reposition calendar image"
+          description="Framed at 16:9 · drag to reposition · pinch or scroll to zoom"
+          onCancel={() => setCropOpen(false)}
+          onSave={handleSaveCrop}
+        />
+      )}
+    </div>
   );
 }

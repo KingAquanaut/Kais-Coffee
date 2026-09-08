@@ -5,7 +5,7 @@
 // The smaller named exports (badges, CTA, footer) are also used directly in page.tsx.
 import Link from "next/link";
 import { useLang } from "@/contexts/LangContext";
-import { optimized, cropped, parseCrop } from "@/lib/cloudinary";
+import { optimized, cropped, parseCrop, type CropRect } from "@/lib/cloudinary";
 import type { PageContent } from "@/lib/api";
 
 // ── Internal layout helpers (client-safe, no hooks) ────────────────────────
@@ -177,12 +177,17 @@ export function AboutVisitCards({
   saturday,
   sunday,
   mapEmbedUrl,
+  calendarImageUrl,
+  calendarImageCrop,
 }: {
   addressLines: string[];
   weekday: string;
   saturday: string;
   sunday: string;
   mapEmbedUrl: string;
+  /** Optional admin-uploaded schedule graphic. Omitted → placeholder card. */
+  calendarImageUrl?: string | null;
+  calendarImageCrop?: CropRect | null;
 }) {
   const { strings: { about: s } } = useLang();
   return (
@@ -204,6 +209,45 @@ export function AboutVisitCards({
             <div className="flex justify-between"><span>{s.sunday}</span><span>{sunday}</span></div>
           </div>
         </div>
+      </div>
+
+      {/* Schedule / calendar graphic — pop-ups, private events, seasonal hours.
+          Fixed 16:9 frame so the section keeps its rhythm whether or not an
+          image exists; the crop rect decides which part of the upload shows. */}
+      <div className="mt-6">
+        <p className="font-bold mb-3" style={{ fontFamily: "var(--font-heading)" }}>
+          {s.scheduleTitle}
+        </p>
+        {calendarImageUrl ? (
+          <div
+            className="rounded-2xl overflow-hidden"
+            style={{ border: "1.5px solid var(--kc-border)", background: "var(--kc-cream)" }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={cropped(calendarImageUrl, calendarImageCrop, "f_auto,q_auto,c_fill,w_1200,h_675")!}
+              alt={s.scheduleTitle}
+              style={{ display: "block", width: "100%", aspectRatio: "16 / 9", objectFit: "cover" }}
+            />
+          </div>
+        ) : (
+          <div
+            className="rounded-2xl flex flex-col items-center justify-center text-center px-6"
+            style={{
+              aspectRatio: "16 / 9",
+              background: "linear-gradient(145deg, var(--kc-cream) 0%, #f3ead6 100%)",
+              border: "1.5px dashed var(--kc-gold-lt)",
+            }}
+          >
+            <span aria-hidden style={{ fontSize: "1.75rem", lineHeight: 1 }}>🗓️</span>
+            <p className="text-sm font-semibold mt-3" style={{ color: "var(--kc-blue-deep)" }}>
+              {s.scheduleEmptyTitle}
+            </p>
+            <p className="text-xs mt-1" style={{ color: "var(--kc-muted)", maxWidth: "40ch" }}>
+              {s.scheduleEmptyBody}
+            </p>
+          </div>
+        )}
       </div>
 
       {mapEmbedUrl.includes("/maps/embed") ? (
@@ -506,6 +550,8 @@ export function AboutPageContent({ content }: { content: PageContent }) {
           saturday={val("location_hours_saturday")}
           sunday={val("location_hours_sunday")}
           mapEmbedUrl={val("location_map_embed")}
+          calendarImageUrl={(content.calendar_image_url as string | null) ?? null}
+          calendarImageCrop={parseCrop(content.calendar_image_crop)}
         />
       </Section>
 

@@ -5,7 +5,7 @@ import type { ReactNode } from "react";
 import {
   IconDashboard, IconUsers, IconCoffee,
   IconHome, IconInfo, IconQr, IconReceipt,
-  IconChevronLeft, IconChevronRight, IconClose, IconLogout,
+  IconChevronLeft, IconChevronRight, IconClose, IconLogout, IconExternal,
 } from "./Icon";
 import { PURCHASES_ENABLED } from "@/lib/features";
 
@@ -141,6 +141,24 @@ export default function AdminSidebar({
               );
             })}
           </ul>
+
+          {/* Back to the public site. A plain link, so the Sanctum token in
+              localStorage is untouched and /admin is still authenticated on
+              return. Deliberately not next to Sign out, to avoid a misclick. */}
+          <div className="mt-3 pt-3" style={{ borderTop: "1px solid var(--admin-border)" }}>
+            <Link
+              href="/"
+              onClick={onMobileClose}
+              className="admin-nav-link"
+              title={collapsed ? "View site" : undefined}
+              style={collapsed
+                ? { justifyContent: "center", padding: "0.625rem" }
+                : undefined}
+            >
+              <span className="shrink-0 flex items-center"><IconExternal /></span>
+              {!collapsed && <span className="truncate">View site</span>}
+            </Link>
+          </div>
         </nav>
 
         {/* Footer — user + collapse */}

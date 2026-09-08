@@ -11,6 +11,19 @@ use Illuminate\Http\Request;
 
 class PageContentController extends Controller
 {
+    /**
+     * Named image slots that may be uploaded through uploadImageByKey().
+     * Each slot stores its URL at "{key}_url" and its crop at "{key}_crop".
+     * Kept as one list so the upload and remove endpoints cannot drift apart.
+     */
+    private const IMAGE_KEYS = [
+        'team_member_1_photo',
+        'team_member_2_photo',
+        'team_member_3_photo',
+        // Schedule / calendar graphic shown in the "Where to find us" section.
+        'calendar_image',
+    ];
+
     public function __construct(private UploadService $uploads) {}
 
     /**
@@ -97,8 +110,7 @@ class PageContentController extends Controller
      */
     public function uploadImageByKey(Request $request, string $page, string $imageKey): JsonResponse
     {
-        $allowed = ['team_member_1_photo', 'team_member_2_photo', 'team_member_3_photo'];
-        if (!in_array($imageKey, $allowed, true)) {
+        if (!in_array($imageKey, self::IMAGE_KEYS, true)) {
             return response()->json(['message' => 'Invalid image key.'], 422);
         }
 
@@ -126,8 +138,7 @@ class PageContentController extends Controller
      */
     public function removeImageByKey(string $page, string $imageKey): JsonResponse
     {
-        $allowed = ['team_member_1_photo', 'team_member_2_photo', 'team_member_3_photo'];
-        if (!in_array($imageKey, $allowed, true)) {
+        if (!in_array($imageKey, self::IMAGE_KEYS, true)) {
             return response()->json(['message' => 'Invalid image key.'], 422);
         }
 
